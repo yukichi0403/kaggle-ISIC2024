@@ -1,0 +1,15 @@
+batch_size: 32
+epochs: 40
+lr: 1e-3 #1e-4
+early_stopping_rounds: 10
+
+device: cuda:0
+num_workers: 4
+seed: 1234
+use_wandb: False
+
+data_dir:
+local_dir:
+
+# Evaluation
+model_path: 
