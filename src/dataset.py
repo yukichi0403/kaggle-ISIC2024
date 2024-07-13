@@ -5,42 +5,49 @@ from typing import Tuple
 from termcolor import cprint
 from torch.utils.data import Dataset
 import albumentations as A
+import h5py
+from PIL import Image
+from io import BytesIO
+import pandas as pd
 
 
-class Dataset(Dataset):
-    def __init__(self, split: str, data_dir: str = "data", augs = None) -> None:
-        super().__init__()
+class SkinCancerDataset(Dataset):
+    def __init__(self, split: str, df: pd.DataFrame, data_dir: str, augs=None) -> None:
 
         assert split in ["train", "val", "test"], f"Invalid split: {split}"
         self.split = split
-        self.num_classes = #write the number of classes
-        self.X = torch.load(os.path.join(data_dir,)) #write the path to the data
+        self.num_classes = 1  # クラス数を設定
         self.augs = augs
+        self.df = df
+        self.isic_ids = self.df['isic_id'].values
 
         if split in ["train", "val"]:
-            self.y = torch.load(os.path.join(data_dir,)) #write the path to the labels
-            assert len(torch.unique(self.y)) == self.num_classes, "Number of classes do not match."
+            self.fp_hdf = h5py.File(os.path.join(data_dir, "train-image.hdf5"), mode="r")
+            self.targets = self.df['target'].values
+        else:
+            self.fp_hdf = h5py.File(os.path.join(data_dir, "test-image.hdf5"), mode="r")
 
     def __len__(self) -> int:
-        return len(self.X)
+        return len(self.isic_ids)
 
     def __getitem__(self, i):
-        X = self.__standarize(self.X[i])
+        isic_id = self.isic_ids[i]
+        X = np.array(Image.open(BytesIO(self.fp_hdf[isic_id][()])))
+        X = self.__standarize(X)
         if self.augs:
             X = self.__random_transform(X, self.augs)
-        if hasattr(self, "y"):
-            return X, self.y[i]
+        if self.split in ["train", "val"]:
+            return X, self.targets[i]
         else:
             return X
-
+    
     def __standarize(self, img):
-        # Standarize per image
+        img = img.astype(np.float32) / 255.0
         ep = 1e-6
         m = np.nanmean(img.flatten())
         s = np.nanstd(img.flatten())
-        img = (img-m)/(s+ep)
+        img = (img - m) / (s + ep)
         img = np.nan_to_num(img, nan=0.0)
-
         return img
 
     def __random_transform(self, img, transform):
@@ -50,8 +57,10 @@ class Dataset(Dataset):
 
     @property
     def num_channels(self) -> int:
-        return self.X.shape[1]
+        sample_image = np.array(Image.open(BytesIO(self.fp_hdf[self.isic_ids[0]][()])))
+        return sample_image.shape[2]
 
     @property
     def seq_len(self) -> int:
-        return self.X.shape[2]
+        sample_image = np.array(Image.open(BytesIO(self.fp_hdf[self.isic_ids[0]][()])))
+        return sample_image.shape[0]
