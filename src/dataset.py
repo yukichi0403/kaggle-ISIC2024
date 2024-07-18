@@ -9,8 +9,25 @@ import h5py
 from PIL import Image
 from io import BytesIO
 import pandas as pd
+import cv2
 
-from utils import remove_hair
+
+def remove_hair(image, threshold):
+    # 画像をグレースケールに変換
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    # ブラックハットフィルタを適用
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9)) #9x9の矩形カーネルを作成
+    blackhat = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel) #ブラックハット変換を適用
+    
+    #ブラックハットイメージを二値化。閾値10を超えるピクセルは255に、その他のピクセルは0に設定
+    _, thresh = cv2.threshold(blackhat, threshold, 255, cv2.THRESH_BINARY) 
+    
+    # 元の画像をインペイントして髪の毛を除去
+    inpainted_image = cv2.inpaint(image, thresh, 1, cv2.INPAINT_TELEA)
+    
+    return inpainted_image
+
 
 
 class SkinCancerDataset(Dataset):
