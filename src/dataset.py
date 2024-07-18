@@ -15,7 +15,7 @@ from utils import remove_hair
 
 class SkinCancerDataset(Dataset):
     def __init__(self, split: str, df: pd.DataFrame, data_dir: str, augs=None, 
-                 remove_hari_thresh:int =15) -> None:
+                 remove_hair_thresh:int =15) -> None:
 
         assert split in ["train", "val", "test"], f"Invalid split: {split}"
         self.split = split
@@ -49,7 +49,7 @@ class SkinCancerDataset(Dataset):
             return X
     
     def __remove_hair(self, img):
-        return remove_hair(img, self.remove_hari_thresh)
+        return remove_hair(img, self.remove_hair_thresh)
 
     def __random_transform(self, img, transform):
         assert isinstance(transform, A.Compose), "Transform must be an instance of albumentations.Compose"
