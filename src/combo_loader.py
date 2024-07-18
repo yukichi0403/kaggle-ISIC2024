@@ -1,7 +1,6 @@
 import sys
 import numpy as np
 from torch.utils.data import DataLoader, WeightedRandomSampler
-from utils import *
 
 
 # https://github.com/huanghoujing/pytorch-wrapping-multi-dataloaders/blob/master/wrapping_multi_dataloaders.py
