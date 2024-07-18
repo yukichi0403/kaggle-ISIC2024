@@ -17,6 +17,8 @@ import wandb
 from sklearn.model_selection import GroupKFold, StratifiedKFold
 
 from src.utils import *
+from src.dataset import SkinCancerDataset
+from src.combo_loader import get_combo_loader
 
 
 
@@ -111,7 +113,6 @@ def run(args: DictConfig):
     set_seed(args.seed)
     
     train = pd.read_csv(os.path.join(args.data_dir, "train-metadata.csv"))
-    train = train.iloc[:100,:]
     skf = StratifiedKFold(n_splits = args.num_splits)
     for fold, (_, val_index) in enumerate(skf.split(train,train[['target']])):
         train.loc[val_index, 'fold'] = fold
