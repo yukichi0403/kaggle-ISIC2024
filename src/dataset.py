@@ -10,16 +10,22 @@ from PIL import Image
 from io import BytesIO
 import pandas as pd
 
+from utils import remove_hair
+
 
 class SkinCancerDataset(Dataset):
-    def __init__(self, split: str, df: pd.DataFrame, data_dir: str, augs=None) -> None:
+    def __init__(self, split: str, df: pd.DataFrame, data_dir: str, augs=None, 
+                 remove_hari_thresh:int =15) -> None:
 
         assert split in ["train", "val", "test"], f"Invalid split: {split}"
         self.split = split
-        self.num_classes = 1  # クラス数を設定
+        if split != "test":
+            self.dr = df["target"].values
+        self.num_classes = 2
         self.augs = augs
         self.df = df
         self.isic_ids = self.df['isic_id'].values
+        self.remove_hair_thresh = remove_hair_thresh
 
         if split in ["train", "val"]:
             self.fp_hdf = h5py.File(os.path.join(data_dir, "train-image.hdf5"), mode="r")
@@ -33,7 +39,8 @@ class SkinCancerDataset(Dataset):
     def __getitem__(self, i):
         isic_id = self.isic_ids[i]
         X = np.array(Image.open(BytesIO(self.fp_hdf[isic_id][()])))
-        X = self.__standarize(X)
+        if self.remove_hair_thresh > 0:            
+            X = self.__remove_hair(X)
         if self.augs:
             X = self.__random_transform(X, self.augs)
         if self.split in ["train", "val"]:
@@ -41,14 +48,8 @@ class SkinCancerDataset(Dataset):
         else:
             return X
     
-    def __standarize(self, img):
-        img = img.astype(np.float32) / 255.0
-        ep = 1e-6
-        m = np.nanmean(img.flatten())
-        s = np.nanstd(img.flatten())
-        img = (img - m) / (s + ep)
-        img = np.nan_to_num(img, nan=0.0)
-        return img
+    def __remove_hair(self, img):
+        return remove_hair(img, self.remove_hari_thresh)
 
     def __random_transform(self, img, transform):
         assert isinstance(transform, A.Compose), "Transform must be an instance of albumentations.Compose"

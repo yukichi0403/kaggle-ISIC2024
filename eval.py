@@ -1,4 +1,5 @@
 import os, sys
+from dataset import SkinCancerDataset
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -13,61 +14,63 @@ from src.datasets import *
 from src.models import *
 from src.utils import *
 
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
+
 import shutil
 import gc
 
 
 @torch.no_grad()
 @hydra.main(version_base=None, config_path="configs", config_name="config_colab")
-def run(args: DictConfig):
+def inference(args: DictConfig):
     set_seed(args.seed)
-    savedir = os.path.dirname(args.model_path)
+
+    test_transforms = A.Compose([
+        A.Resize(args.img_size, args.img_size),
+        A.Normalize(
+                    mean=[0.485, 0.456, 0.406], 
+                    std=[0.229, 0.224, 0.225], 
+                    max_pixel_value=255.0, 
+                    p=1),
+        ToTensorV2()
+    ])
     
     # ------------------
     #    Dataloader
     # ------------------    
-    test_set = Dataset("test", args.data_dir)
+    test_set = SkinCancerDataset("test", args.data_dir,
+                                  test_transforms,args.remove_hair_thresh
+                                 )
     test_loader = torch.utils.data.DataLoader(
         test_set, shuffle=False, batch_size=args.batch_size, num_workers=args.num_workers
     )
 
     folds_preds = []
     for fold in range(args.num_splits):
+        if args.test and fold > 0:
+            print(f"Test mode. Skipping fold{fold+1}")
+            continue
         print(f"Fold {fold+1}/{args.num_splits}")
         model = CustomModel(
-            args.backbone,
-            args.num_classes
+                            model_name=args.model_name,
+                            num_classes=args.num_classes, # write the number of classes
+                         pretrained=True, 
+                         aux_loss_ratio= args.aux_loss_ratio, 
+                         dropout_rate=args.dropout
         ).to(args.device)
-        model.load_state_dict(torch.load(os.path.join(args.model_path, f"model_best_{fold}.pt"), map_location=args.device))
+
+        model.load_state_dict(torch.load(os.path.join(args.local_dir, f"model_best_fold{fold+1}.pt"), map_location=args.device))
         
         model.eval()
         preds = [] 
-        for X, subject_idxs in tqdm(test_loader, desc="Validation"):        
+        for X, _ in tqdm(test_loader, desc="Validation"):        
             preds.append(model(X.to(args.device)).detach().cpu())
         
         preds = torch.cat(preds, dim=0).numpy()
         folds_preds.append(preds)
     
     final_preds = np.mean(folds_preds, axis=0)
-    np.save(os.path.join(savedir, "submission.npy"), final_preds)
-    cprint(f"Submission {final_preds.shape} saved at {savedir}", "cyan")
+    return final_preds
+    cprint(f"Submission {final_preds.shape}", "cyan")
 
-    
-
-    if args.local_dir:
-        # Localにコピー
-        local_dir = os.path.join(args.local_dir, f"{args.expname}_{args.ver}")
-        os.makedirs(local_dir, exist_ok=True)
-
-        submission_path = os.path.join(savedir, "submission.npy")
-        if os.path.exists(submission_path):
-            shutil.copy(submission_path, local_dir)
-            print(f'Submission file saved to Local: {local_dir}')
-
-        model_path = os.path.join(savedir, f"model_best_{fold}.pt")
-        if os.path.exists(model_path):
-            shutil.copy(model_path, local_dir)
-            print(f'Model saved to Local: {local_dir}')
-
-if __name__ == "__main__":
-    run()

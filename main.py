@@ -1,141 +1,232 @@
-import os, sys
+import pandas as pd
 import numpy as np
+import os
+from tqdm import tqdm
 import torch
+from typing import Tuple
+from termcolor import cprint
 import torch.nn.functional as F
-from torchmetrics import Accuracy
+
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 import hydra
 from omegaconf import DictConfig
-import wandb
-from termcolor import cprint
-from tqdm import tqdm
-
-from src.datasets import *
-from src.models import *
-from src.utils import *
-import albumentations as A
-
 import shutil
+import wandb
+
+from sklearn.model_selection import GroupKFold, StratifiedKFold
+
+from src.utils import *
+
+
+
+
+def cross_entropy_loss(input: torch.Tensor,
+                             target: torch.Tensor
+                             ) -> torch.Tensor:
+    return -(input.log_softmax(dim=-1) * target).sum(dim=-1).mean()
+
+
+def get_dataset_and_loader(loader_args, train_df, val_df, train_transforms, val_transforms, data_dir, remove_hair_thresh=10):
+    train_dataset = SkinCancerDataset("train", train_df, data_dir,
+                                  train_transforms,remove_hair_thresh
+                                 )
+    train_loader = torch.utils.data.DataLoader(train_dataset, shuffle=True, **loader_args)
+
+    val_dataset = SkinCancerDataset("val", val_df, data_dir,  
+                                  val_transforms,remove_hair_thresh  
+                                 )
+    val_loader = torch.utils.data.DataLoader(val_dataset, shuffle=False, **loader_args)  
+    
+    return train_loader, val_loader
+
+
+def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func):
+    losses, all_labels, all_preds = [], [], []
+
+    train = optimizer is not None
+    if train:
+        model.train()
+        current_lr = optimizer.param_groups[0]["lr"]
+    else: 
+        model.eval()
+    
+    mode = "Train" if train else "Validation"
+    for batch in tqdm(loader, desc=mode):
+        
+        if train and args.do_mixup:
+            lam = np.random.beta(a=args.do_mixup, b=1)
+
+            inputs, labels = batch[0][0], batch[0][1]
+            balanced_inputs, balanced_labels = batch[1][0], batch[1][1]
+
+            inputs, labels = inputs.to(args.device), labels.squeeze().to(args.device)
+            balanced_inputs, balanced_labels = balanced_inputs.to(args.device), balanced_labels.squeeze().to(args.device)
+
+            inputs = (1 - lam) * inputs + lam * balanced_inputs
+            mixed_labels = (1 - lam) * F.one_hot(labels, args.num_classes) + lam * F.one_hot(balanced_labels, args.num_classes)
+
+            del balanced_inputs
+            del balanced_labels
+        else:
+            inputs, labels = batch[0].to(args.device), batch[1].squeeze().to(args.device)
+
+        y_pred = model(inputs)
+        if train and args.do_mixup:
+            loss = cross_entropy_loss(y_pred, mixed_labels)
+        else:
+            loss = loss_func(y_pred, labels)  # 修正: loss_funcを使用
+
+        # 予測値とラベルを保存
+        all_preds.append(y_pred.softmax(dim=1).cpu().detach().numpy())
+        all_labels.append(labels.cpu().numpy())
+
+        if train:  # 訓練モードのみ
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+            if lr_scheduler is not None:
+                lr_scheduler.step()
+        
+        losses.append(loss.item())
+    
+    # すべてのバッチの予測値とラベルを結合
+    all_preds = np.concatenate(all_preds, axis=0)
+    all_labels = np.concatenate(all_labels, axis=0)
+
+    # スコアとAUCを計算
+    score, auc_score = calculate_pauc_and_auc(all_labels, all_preds[:, 1])
+
+    if train:
+        print(f"Epoch {epoch+1}/{args.epochs} | {mode} loss: {np.mean(losses):.3f} | {mode} score: {score:.3f} | {mode} auc: {auc_score:.3f} | lr: {current_lr:.7f}")
+    else:
+        print(f"Epoch {epoch+1}/{args.epochs} | {mode} loss: {np.mean(losses):.3f} | {mode} score: {score:.3f} | {mode} auc: {auc_score:.3f}")
+    
+    return np.mean(losses), score, auc_score
+
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="config")
-def run(args: DictConfig):
+def run(args: DictConfig): 
     set_seed(args.seed)
-    logdir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
+    
+    train = pd.read_csv(os.path.join(args.data_dir, "train-metadata.csv"))
+    train = train.iloc[:100,:]
+    skf = StratifiedKFold(n_splits = args.num_splits)
+    for fold, (_, val_index) in enumerate(skf.split(train,train[['target']])):
+        train.loc[val_index, 'fold'] = fold
+    
+    
+    logdir = "/kaggle/working/" if not args.COLAB else hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
     
     if args.use_wandb:
-        wandb.init(mode="online", dir=logdir, project="MEG-classification")
-
-    # ------------------
-    #    Dataloader
-    # ------------------
+        wandb.init(mode="online", dir=logdir, project="ISIC2024")
+        
+        
     loader_args = {"batch_size": args.batch_size, "num_workers": args.num_workers}
-    transform = A.Compose([A.NoOp()])
+    train_transform = A.Compose([                        
+                        A.Resize(args.img_size,args.img_size),
+                        A.Normalize(
+                        mean=[0.485, 0.456, 0.406], 
+                        std=[0.229, 0.224, 0.225], 
+                        max_pixel_value=255.0, 
+                        p=1),
+                        ToTensorV2()])
+    val_transforms  = A.Compose([                        
+                        A.Resize(args.img_size,args.img_size),
+                        A.Normalize(
+                        mean=[0.485, 0.456, 0.406], 
+                        std=[0.229, 0.224, 0.225], 
+                        max_pixel_value=255.0, 
+                        p=1),
+                        ToTensorV2()])
+        
+    for fold in range(args.num_splits):
+        if args.test and fold > 0:
+            print(f"Test mode. Skipping fold{fold+1}")
+            continue
+        train_df = train[train["fold"] != fold]
+        valid_df = train[train["fold"] == fold]
+        print(f"fold{fold+1}'s train target ratio: {train_df['target'].mean()}. valid target ratio: {valid_df['target'].mean()}")
+
+        # ------------------
+        #    Dataloader
+        # ------------------
+        train_loader, val_loader = get_dataset_and_loader(loader_args, train_df, valid_df, train_transform, val_transforms, args.data_dir, args.remove_hair_thresh)
+
+        # ------------------
+        #       Model
+        # ------------------
+        model = CustomModel(
+                         model_name=args.model_name,
+                         num_classes=args.num_classes, # write the number of classes
+                         pretrained=True, 
+                         aux_loss_ratio= args.aux_loss_ratio, 
+                         dropout_rate=args.dropout
+        ).to(args.device)
+
+        if args.pretrain_dir:
+            model.load_state_dict(torch.load(os.path.join(args.pretrain_dir, f"model_best_fold{fold+1}.pt")))
+
+        # ------------------
+        #     Optimizer
+        # ------------------
+        optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
+        train_size = len(train_loader)*args.batch_size
+        lr_scheduler = get_scheduler(args, optimizer, train_size=train_size)
     
-    train_set = ThingsMEGDataset("train", args.data_dir, transform=transform)
-    train_loader = torch.utils.data.DataLoader(train_set, shuffle=True, **loader_args)
-    val_set = ThingsMEGDataset("val", args.data_dir)
-    val_loader = torch.utils.data.DataLoader(val_set, shuffle=False, **loader_args)
-    test_set = ThingsMEGDataset("test", args.data_dir)
-    test_loader = torch.utils.data.DataLoader(
-        test_set, shuffle=False, batch_size=args.batch_size, num_workers=args.num_workers
-    )
+    
+        # ------------------
+        #   Start training
+        # ------------------  
+        max_val_score = 0
+        no_improve_epochs = 0
 
-    # ------------------
-    #       Model
-    # ------------------
-    model = CustomModel(
-        train_set.num_classes, train_set.seq_len, train_set.num_channels
-    ).to(args.device)
+        for epoch in range(args.epochs):
+            print(f"Epoch {epoch+1}/{args.epochs}")
 
-    # ------------------
-    #     Optimizer
-    # ------------------
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
-
-    # ------------------
-    #   Start training
-    # ------------------  
-    max_val_acc = 0
-    no_improve_epochs = 0
-    mertic = Accuracy(
-        task="multiclass", num_classes=train_set.num_classes, top_k=10
-    ).to(args.device)
-      
-    for epoch in range(args.epochs):
-        print(f"Epoch {epoch+1}/{args.epochs}")
-        
-        train_loss, train_acc, val_loss, val_acc = [], [], [], []
-        current_lr = optimizer.param_groups[0]["lr"]
-        
-        model.train()
-        for X, y in tqdm(train_loader, desc="Train"):
-            X, y = X.to(args.device), y.to(args.device)
-
-            y_pred = model(X)
+            train_loss, train_acc, val_loss, val_acc = [], [], [], []
+            current_lr = optimizer.param_groups[0]["lr"]
             
-            loss = F.cross_entropy(y_pred, y)
-            train_loss.append(loss.item())
-            
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            
-            acc = mertic(y_pred, y)
-            train_acc.append(acc.item())
+            if args.do_mixup:   
+                #train mixup dataset
+                train_loader = get_combo_loader(train_loader, base_sampling="instance")
+                #mixupの場合は、train_loader=combo_loader
+                _, _ = run_one_epoch(train_loader, model, optimizer, lr_scheduler, args, logdir, epoch, torch.nn.CrossEntropyLoss())
+            else:
+                train_loss, train_score, train_auc = run_one_epoch(train_loader, model, optimizer, lr_scheduler, args, logdir, epoch, torch.nn.CrossEntropyLoss())
 
-        model.eval()
-        for X, y in tqdm(val_loader, desc="Validation"):
-            X, y = X.to(args.device), y.to(args.device)
-            
             with torch.no_grad():
-                y_pred = model(X)
-            
-            val_loss.append(F.cross_entropy(y_pred, y).item())
-            val_acc.append(mertic(y_pred, y).item())
+                if args.do_mixup:
+                    #ここで実際のTrainDataに対するロスを計算
+                    train_loss, train_score, train_auc = run_one_epoch(train_loader, model, None, None, args, logdir, epoch, torch.nn.CrossEntropyLoss())
+                    val_loss, val_score, val_auc = run_one_epoch(val_loader, model, None, None, args, logdir, epoch, torch.nn.CrossEntropyLoss())
+                else:
+                    val_loss, val_score, val_auc = run_one_epoch(val_loader, model,  None, None, args, logdir, epoch, torch.nn.CrossEntropyLoss())
+                
+            if args.use_wandb:
+                wandb.log({"train_loss": np.mean(train_loss), "train_score": np.mean(train_score), "train_auc": np.mean(train_auc), 
+                           "val_loss": np.mean(val_loss), "val_score": np.mean(val_score), "val_auc": np.mean(val_auc),
+                           "lr": current_lr})
 
-        print(f"Epoch {epoch+1}/{args.epochs} | train loss: {np.mean(train_loss):.3f} | train acc: {np.mean(train_acc):.3f} | val loss: {np.mean(val_loss):.3f} | val acc: {np.mean(val_acc):.3f} | lr: {current_lr:.7f}")
-        torch.save(model.state_dict(), os.path.join(logdir, "model_last.pt"))
-        if args.use_wandb:
-            wandb.log({"train_loss": np.mean(train_loss), "train_acc": np.mean(train_acc), "val_loss": np.mean(val_loss), "val_acc": np.mean(val_acc), "lr": current_lr})
-        
-        if np.mean(val_acc) > max_val_acc:
-            cprint("New best.", "cyan")
-            model_path = os.path.join(logdir, "model_best.pt")
-            torch.save(model.state_dict(), model_path)
-            max_val_acc = np.mean(val_acc)
-            no_improve_epochs = 0
-        else:
-            no_improve_epochs += 1
-            if no_improve_epochs > args.early_stopping_rounds:
-                cprint("Early stopping.", "cyan")
-                break
-  
-    
-    # ----------------------------------
-    #  Start evaluation with best model
-    # ----------------------------------
-    model.load_state_dict(torch.load(os.path.join(logdir, "model_best.pt"), map_location=args.device))
-
-    preds = [] 
-    model.eval()
-    for X, subject_idxs in tqdm(test_loader, desc="Validation"):        
-        preds.append(model(X.to(args.device)).detach().cpu())
-        
-    preds = torch.cat(preds, dim=0).numpy()
-    np.save(os.path.join(logdir, "submission"), preds)
-    cprint(f"Submission {preds.shape} saved at {logdir}", "cyan")
+            if np.mean(val_score) > max_val_score:
+                cprint("New best.", "cyan")
+                model_path = os.path.join(logdir, f"model_best_fold{fold+1}.pt")
+                torch.save(model.state_dict(), model_path)
+                max_val_score = np.mean(val_score)
+                no_improve_epochs = 0
+            else:
+                no_improve_epochs += 1
+                if no_improve_epochs > args.early_stopping_rounds:
+                    cprint("Early stopping.", "cyan")
+                    break
 
     if args.local_dir:
         # Localにコピー
         local_dir = os.path.join(args.local_dir, f"{args.expname}_{args.ver}")
         os.makedirs(local_dir, exist_ok=True)
 
-        submission_path = os.path.join(logdir, "submission.npy")
-        if os.path.exists(submission_path):
-            shutil.copy(submission_path, local_dir)
-            print(f'Submission file saved to Local: {local_dir}')
-
-        model_path = os.path.join(logdir, f"model_best.pt")
+        model_path = os.path.join(logdir, f"model_best_fold{fold+1}.pt")
         if os.path.exists(model_path):
             shutil.copy(model_path, local_dir)
             print(f'Model saved to Local: {local_dir}')

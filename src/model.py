@@ -3,6 +3,24 @@ import torch.nn as nn
 import torch.nn.functional as F
 import timm
 
+class GeM(nn.Module):
+    def __init__(self, p=3, eps=1e-6):
+        super(GeM, self).__init__()
+        self.p = nn.Parameter(torch.ones(1)*p)
+        self.eps = eps
+
+    def forward(self, x):
+        return self.gem(x, p=self.p, eps=self.eps)
+        
+    def gem(self, x, p=3, eps=1e-6):
+        return F.avg_pool2d(x.clamp(min=eps).pow(p), (x.size(-2), x.size(-1))).pow(1./p)
+        
+    def __repr__(self):
+        return self.__class__.__name__ + \
+                '(' + 'p=' + '{:.4f}'.format(self.p.data.tolist()[0]) + \
+                ', ' + 'eps=' + str(self.eps) + ')'
+
+    
 class CustomModel(nn.Module):
     def __init__(self, 
                  model_name, 
@@ -15,7 +33,7 @@ class CustomModel(nn.Module):
         self.encoder = timm.create_model(model_name, pretrained=pretrained,
                                           drop_path_rate=dropout_rate)
         self.features = nn.Sequential(*list(self.encoder.children())[:-2])
-        self.GAP = nn.AdaptiveAvgPool2d(1)
+        self.GeM = GeM()
         self.decoder = nn.Sequential(
             nn.Flatten(),
             nn.Dropout(dropout_rate),
@@ -28,15 +46,14 @@ class CustomModel(nn.Module):
                 nn.Linear(self.encoder.num_features, 4)
                 )
         
-    def expand_dims(self, images):
-        # Expand dims to [B, H, W, 3]
-        #images = images.unsqueeze(1).expand(-1, 3, -1, -1) #if you want to add a channel dimension
+    def modify_dims(self, images):
+        images = images.permute((0, 3, 1, 2))  # (B, H, W, C) を (B, C, H, W) に変換
         return images
 
     def forward(self, images):
-        #images = self.expand_dims(images) #if you want to add a channel dimension
+        images = self.modify_dims(images) #if you want to add a channel dimension
         out = self.features(images)
-        out = self.GAP(out)
+        out = self.GeM(out)
         main_out = self.decoder(out.view(out.size(0), -1))
         
         if self.aux_loss_ratio is not None:
