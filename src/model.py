@@ -45,13 +45,8 @@ class CustomModel(nn.Module):
                 nn.Dropout(dropout_rate),
                 nn.Linear(self.encoder.num_features, 4)
                 )
-        
-    def modify_dims(self, images):
-        images = images.permute((0, 3, 1, 2))  # (B, H, W, C) を (B, C, H, W) に変換
-        return images
 
     def forward(self, images):
-        images = self.modify_dims(images) #if you want to add a channel dimension
         out = self.features(images)
         out = self.GeM(out)
         main_out = self.decoder(out.view(out.size(0), -1))
