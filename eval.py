@@ -22,7 +22,6 @@ import gc
 
 
 @torch.no_grad()
-@hydra.main(version_base=None, config_path="configs", config_name="config_colab")
 def inference(args: DictConfig):
     set_seed(args.seed)
 
