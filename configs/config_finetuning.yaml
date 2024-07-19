@@ -1,10 +1,10 @@
-data_dir: /kaggle/input/isic-2024-challenge
-image_dir: /kaggle/input/isic-2024-challenge/train-image/image
-local_dir: 
+data_dir: /content/drive/MyDrive/24_7_ISIC2024/Input/isic-2024-challenge
+image_dir: /content/drive/MyDrive/24_7_ISIC2024/Input/isic-2024-challenge/image
+local_dir: /content/drive/MyDrive/24_7_ISIC2024/Output
 pretrain_dir:
 COLAB: False
 test: True
-expname: 
+expname: EffNet0b_GKF
 ver: 
 
 model_name: tf_efficientnet_b0.ns_jft_in1k
@@ -17,7 +17,7 @@ epochs: 20
 lr: 1e-3 #1e-4
 early_stopping_rounds: 3
 num_splits: 5
-do_mixup: 0.5
+do_mixup: False
 
 device: cuda:0
 num_workers: 4
@@ -26,4 +26,4 @@ use_wandb: False
 
 img_size: 256
 remove_hair_thresh: 10
-gkf: False
+gkf: True
