@@ -20,23 +20,56 @@ from src.utils import *
 from src.dataset import SkinCancerDataset
 from src.combo_loader import get_combo_loader
 
+# Classのサンプル数のバランスを取るための関数
+def sampling(train, ratio=1):
+    malignant_df = train[train['target'] == 1].copy()
+    benign_df = train[train['target'] == 0].copy()
+
+    # benignのデータをサンプリング
+    benign_sample_df = benign_df.sample(int(len(malignant_df) * ratio), random_state=42)
+    # malignantとサンプリングされたbenignのデータを結合
+    balanced_df = pd.concat([malignant_df, benign_sample_df])
+    # シャッフルしてインデックスをリセット
+    balanced_df = balanced_df.sample(frac=1, random_state=42).reset_index(drop=True)
+    
+    return balanced_df
 
 
+def load_traindf_and_split(args):
+    if "all-isic-data" in args.data_dir:
+        train = pd.read_csv(os.path.join(args.data_dir, "metadata.csv"))
+        train = train.dropna(subset="benign_malignant")
+        train = train.loc[train["benign_malignant"].isin(["benign", "malignant"]), :]
+        train["target"] = train["benign_malignant"].apply(lambda x: 1 if x=="malignant" else 0)
+    else:
+        train = pd.read_csv(os.path.join(args.data_dir, "train-metadata.csv"))
 
-def cross_entropy_loss(input: torch.Tensor,
-                             target: torch.Tensor
-                             ) -> torch.Tensor:
+    if args.sampling_test:
+        train = sampling(train)
+    if args.gkf:
+        skf = GroupKFold(n_splits = args.num_splits)
+        for fold, (_, val_index) in enumerate(skf.split(train,train[['target']], groups=train['patient_id'])):
+            train.loc[val_index, 'fold'] = fold
+    else:
+        skf = StratifiedKFold(n_splits = args.num_splits, shuffle=True, random_state=args.seed)
+        for fold, (_, val_index) in enumerate(skf.split(train,train[['target']])):
+            train.loc[val_index, 'fold'] = fold
+    
+    return train
+
+
+def cross_entropy_loss(input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     return -(input.log_softmax(dim=-1) * target).sum(dim=-1).mean()
 
 
-def get_dataset_and_loader(loader_args, train_df, val_df, train_transforms, val_transforms, data_dir, remove_hair_thresh=10):
-    train_dataset = SkinCancerDataset("train", train_df, data_dir,
-                                  train_transforms,remove_hair_thresh
+def get_dataset_and_loader(loader_args, train_df, val_df, train_transforms, val_transforms, args):
+    train_dataset = SkinCancerDataset("train", train_df, args.data_dir,
+                                  train_transforms, args.remove_hair_thresh
                                  )
     train_loader = torch.utils.data.DataLoader(train_dataset, shuffle=True, **loader_args)
 
-    val_dataset = SkinCancerDataset("val", val_df, data_dir,  
-                                  val_transforms,remove_hair_thresh  
+    val_dataset = SkinCancerDataset("val", val_df, args.data_dir,  
+                                  val_transforms, args.remove_hair_thresh  
                                  )
     val_loader = torch.utils.data.DataLoader(val_dataset, shuffle=False, **loader_args)  
     
@@ -112,11 +145,7 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
 def run(args: DictConfig): 
     set_seed(args.seed)
     
-    train = pd.read_csv(os.path.join(args.data_dir, "train-metadata.csv"))
-    skf = StratifiedKFold(n_splits = args.num_splits)
-    for fold, (_, val_index) in enumerate(skf.split(train,train[['target']])):
-        train.loc[val_index, 'fold'] = fold
-    
+    train = load_traindf_and_split(args)
     
     logdir = "/kaggle/working/" if not args.COLAB else hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
     
@@ -167,7 +196,7 @@ def run(args: DictConfig):
         ).to(args.device)
 
         if args.pretrain_dir:
-            model.load_state_dict(torch.load(os.path.join(args.pretrain_dir, f"model_best_fold{fold+1}.pt")))
+            model.load_state_dict(torch.load(os.path.join(args.pretrain_dir, f"model_best_fold{fold+1}.pt"), map_location=args.device))
 
         # ------------------
         #     Optimizer
@@ -191,19 +220,19 @@ def run(args: DictConfig):
             
             if args.do_mixup:   
                 #train mixup dataset
-                train_loader = get_combo_loader(train_loader, base_sampling="instance")
+                combo_loader = get_combo_loader(train_loader, base_sampling="instance")
                 #mixupの場合は、train_loader=combo_loader
-                _, _ = run_one_epoch(train_loader, model, optimizer, lr_scheduler, args, logdir, epoch, torch.nn.CrossEntropyLoss())
+                _, _ , _ = run_one_epoch(combo_loader, model, optimizer, lr_scheduler, args, epoch, torch.nn.CrossEntropyLoss())
             else:
-                train_loss, train_score, train_auc = run_one_epoch(train_loader, model, optimizer, lr_scheduler, args, logdir, epoch, torch.nn.CrossEntropyLoss())
+                train_loss, train_score, train_auc = run_one_epoch(train_loader, model, optimizer, lr_scheduler, args, epoch, torch.nn.CrossEntropyLoss())
 
             with torch.no_grad():
                 if args.do_mixup:
                     #ここで実際のTrainDataに対するロスを計算
-                    train_loss, train_score, train_auc = run_one_epoch(train_loader, model, None, None, args, logdir, epoch, torch.nn.CrossEntropyLoss())
-                    val_loss, val_score, val_auc = run_one_epoch(val_loader, model, None, None, args, logdir, epoch, torch.nn.CrossEntropyLoss())
+                    train_loss, train_score, train_auc = run_one_epoch(train_loader, model, None, None, args, epoch, torch.nn.CrossEntropyLoss())
+                    val_loss, val_score, val_auc = run_one_epoch(val_loader, model, None, None, args, epoch, torch.nn.CrossEntropyLoss())
                 else:
-                    val_loss, val_score, val_auc = run_one_epoch(val_loader, model,  None, None, args, logdir, epoch, torch.nn.CrossEntropyLoss())
+                    val_loss, val_score, val_auc = run_one_epoch(val_loader, model,  None, None, args, epoch, torch.nn.CrossEntropyLoss())
                 
             if args.use_wandb:
                 wandb.log({"train_loss": np.mean(train_loss), "train_score": np.mean(train_score), "train_auc": np.mean(train_auc), 
