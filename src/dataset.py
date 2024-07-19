@@ -31,8 +31,7 @@ def remove_hair(image, threshold):
 
 
 class SkinCancerDataset(Dataset):
-    def __init__(self, split: str, df: pd.DataFrame, data_dir: str, augs=None, 
-                 remove_hair_thresh:int =15) -> None:
+    def __init__(self, args, split: str, df: pd.DataFrame, augs=None, remove_hair_thresh:int =15,) -> None:
 
         assert split in ["train", "val", "test"], f"Invalid split: {split}"
         self.split = split
@@ -44,11 +43,12 @@ class SkinCancerDataset(Dataset):
         self.isic_ids = self.df['isic_id'].values
         self.remove_hair_thresh = remove_hair_thresh
 
+        self.hdf_dir = "image.hdf5" if "all-isic-data" in args.data_dir else "train-image.hdf5"
         if split in ["train", "val"]:
-            self.fp_hdf = h5py.File(os.path.join(data_dir, "train-image.hdf5"), mode="r")
+            self.fp_hdf = h5py.File(os.path.join(args.data_dir, self.hdf_dir), mode="r")
             self.targets = self.df['target'].values
         else:
-            self.fp_hdf = h5py.File(os.path.join(data_dir, "test-image.hdf5"), mode="r")
+            self.fp_hdf = h5py.File(os.path.join(args.data_dir, "test-image.hdf5"), mode="r")
 
     def __len__(self) -> int:
         return len(self.isic_ids)
