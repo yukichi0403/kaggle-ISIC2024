@@ -4,6 +4,8 @@ local_dir:
 pretrain_dir:
 COLAB: False
 test: True
+expname: 
+ver: 
 
 model_name: tf_efficientnet_b0.ns_jft_in1k
 num_classes: 2
@@ -24,3 +26,4 @@ use_wandb: False
 
 img_size: 256
 remove_hair_thresh: 10
+gkf: False
