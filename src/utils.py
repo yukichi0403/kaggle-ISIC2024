@@ -13,17 +13,18 @@ def set_seed(seed: int = 0) -> None:
     torch.manual_seed(seed)
 
 
-def get_scheduler(args, optimizer,train_size=10027, warmup=True):
-    if warmup:
-        training_steps = -(-train_size // args.batch_size) * args.epochs
-        print(f"Training steps: {training_steps}")
-        scheduler = get_cosine_schedule_with_warmup(
-                optimizer,
-                num_training_steps = training_steps,
-                num_warmup_steps = int(training_steps * 0.1)
-            )
+def get_scheduler(args, optimizer, train_size):
+    training_steps = -(-train_size // args.batch_size) * args.epochs
+    if args.epochs < 10:
+        num_warmup_steps = -(-train_size // args.batch_size)
     else:
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=CONFIG["epochs"], eta_min=0)
+        num_warmup_steps = int(training_steps * 0.1)
+    print(f"Training steps: {training_steps}, num_warmup_steps: {num_warmup_steps}")
+    scheduler = get_cosine_schedule_with_warmup(
+            optimizer,
+            num_training_steps = training_steps,
+            num_warmup_steps = num_warmup_steps
+        )
     return scheduler
 
 
