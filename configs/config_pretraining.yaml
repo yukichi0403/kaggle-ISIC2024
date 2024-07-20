@@ -1,13 +1,13 @@
 data_dir: /content/drive/MyDrive/24_7_ISIC2024/Input/isic-2024-challenge
 image_dir: /content/drive/MyDrive/24_7_ISIC2024/Input/isic-2024-challenge/train-image/image
-train_df_dir: /content/drive/MyDrive/24_7_ISIC2024/Output
-local_dir: 
+train_df_dir: /content/drive/MyDrive/24_7_ISIC2024/Input/isic-2024-challenge/train-metadata-gkffold.csv
+local_dir: /content/drive/MyDrive/24_7_ISIC2024/Output
 pretrain_dir:
 COLAB: False
 test: True
 expname: EffNet0b_Pretraining
 ver: 1
-sampling_test:False
+sampling_test: False
 
 model_name: tf_efficientnet_b0.ns_jft_in1k
 num_classes: 2
