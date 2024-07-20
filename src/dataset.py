@@ -71,7 +71,7 @@ class SkinCancerDataset(Dataset):
     def __random_transform(self, img, transform):
         assert isinstance(transform, A.Compose), "Transform must be an instance of albumentations.Compose"
         img = transform(image=img)['image']
-        return torch.tensor(img)
+        return img
 
     @property
     def num_channels(self) -> int:

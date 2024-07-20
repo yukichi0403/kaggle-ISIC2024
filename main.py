@@ -150,6 +150,7 @@ def run(args: DictConfig):
     #load_traindf_and_split(args)
     
     logdir = "/kaggle/working/" if not args.COLAB else hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
+    print(f"logdir: {logdir}")
     
     if args.use_wandb:
         wandb.init(mode="online", dir=logdir, project="ISIC2024")
