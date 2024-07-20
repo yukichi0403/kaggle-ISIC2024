@@ -1,6 +1,6 @@
-data_dir: /content/drive/MyDrive/24_7_ISIC2024/Input/isic-2024-challenge
-image_dir: /content/drive/MyDrive/24_7_ISIC2024/Input/isic-2024-challenge/train-image/image
-train_df_dir: /content/drive/MyDrive/24_7_ISIC2024/Input/isic-2024-challenge/train-metadata-gkffold.csv
+data_dir: /content/drive/MyDrive/24_7_ISIC2024/Input/all-isic-data-20240629
+image_dir: /content/drive/MyDrive/24_7_ISIC2024/Input/all-isic-data-20240629/train-image/image
+train_df_dir: /content/drive/MyDrive/24_7_ISIC2024/Input/all-isic-data-20240629/archive_train_gkf.csv
 local_dir: /content/drive/MyDrive/24_7_ISIC2024/Output
 pretrain_dir:
 COLAB: False
@@ -14,7 +14,7 @@ num_classes: 2
 dropout: 0.1
 aux_loss_ratio:
 
-batch_size: 32
+batch_size: 64
 epochs: 10
 lr: 5e-4
 early_stopping_rounds: 3
