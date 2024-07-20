@@ -7,6 +7,7 @@ COLAB: False
 test: True
 expname: 
 ver: 
+sampling_test:False
 
 model_name: tf_efficientnet_b0.ns_jft_in1k
 num_classes: 2

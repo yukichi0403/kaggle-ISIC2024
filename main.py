@@ -19,6 +19,7 @@ from sklearn.model_selection import GroupKFold, StratifiedKFold
 from src.utils import *
 from src.dataset import SkinCancerDataset
 from src.combo_loader import get_combo_loader
+from src.model import *
 
 # Classのサンプル数のバランスを取るための関数
 def sampling(train, ratio=1):
@@ -63,12 +64,12 @@ def cross_entropy_loss(input: torch.Tensor, target: torch.Tensor) -> torch.Tenso
 
 
 def get_dataset_and_loader(loader_args, train_df, val_df, train_transforms, val_transforms, args):
-    train_dataset = SkinCancerDataset("train", train_df, args.data_dir,
+    train_dataset = SkinCancerDataset(args, "train", train_df, 
                                   train_transforms, args.remove_hair_thresh
                                  )
     train_loader = torch.utils.data.DataLoader(train_dataset, shuffle=True, **loader_args)
 
-    val_dataset = SkinCancerDataset("val", val_df, args.data_dir,  
+    val_dataset = SkinCancerDataset(args, "val", val_df, 
                                   val_transforms, args.remove_hair_thresh  
                                  )
     val_loader = torch.utils.data.DataLoader(val_dataset, shuffle=False, **loader_args)  
@@ -141,7 +142,7 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
 
 
 
-@hydra.main(version_base=None, config_path="configs", config_name="config")
+@hydra.main(version_base=None, config_path="configs", config_name="config_finetuning")
 def run(args: DictConfig): 
     set_seed(args.seed)
     
@@ -178,12 +179,13 @@ def run(args: DictConfig):
             continue
         train_df = train[train["fold"] != fold]
         valid_df = train[train["fold"] == fold]
-        print(f"fold{fold+1}'s train target ratio: {train_df['target'].mean()}. valid target ratio: {valid_df['target'].mean()}")
+        
+        print(f"fold{fold+1}'s train shape: {train_df.shape[0]}, target ratio: {train_df['target'].mean()}. valid target ratio: {valid_df['target'].mean()}")
 
         # ------------------
         #    Dataloader
         # ------------------
-        train_loader, val_loader = get_dataset_and_loader(loader_args, train_df, valid_df, train_transform, val_transforms, args.data_dir, args.remove_hair_thresh)
+        train_loader, val_loader = get_dataset_and_loader(loader_args, train_df, valid_df, train_transform, val_transforms, args)
 
         # ------------------
         #       Model
