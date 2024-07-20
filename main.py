@@ -106,15 +106,22 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
             del balanced_labels
         else:
             inputs, labels = batch[0].to(args.device), batch[1].squeeze().to(args.device)
-
+        
         y_pred = model(inputs)
+        if (not args.do_mixup) & (isinstance(loss_func, torch.nn.BCEWithLogitsLoss) or isinstance(loss_func, torch.nn.BCELoss)):
+            y_pred = y_pred.squeeze()
+            labels = labels.float()  
+            
         if train and args.do_mixup:
             loss = cross_entropy_loss(y_pred, mixed_labels)
         else:
             loss = loss_func(y_pred, labels)  # 修正: loss_funcを使用
-
+            
         # 予測値とラベルを保存
-        all_preds.append(y_pred.softmax(dim=1).cpu().detach().numpy())
+        if isinstance(loss_func, nn.BCEWithLogitsLoss) or isinstance(loss_func, nn.BCELoss):
+            all_preds.append(y_pred.sigmoid().cpu().detach().numpy())
+        else:
+            all_preds.append(y_pred[:,1].cpu().detach().numpy())
         all_labels.append(labels.cpu().numpy())
 
         if train:  # 訓練モードのみ
@@ -131,8 +138,8 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
     all_labels = np.concatenate(all_labels, axis=0)
 
     # スコアとAUCを計算
-    score, auc_score = calculate_pauc_and_auc(all_labels, all_preds[:, 1])
-
+    score, auc_score = calculate_pauc_and_auc(all_labels, all_preds)
+    
     if train:
         print(f"Epoch {epoch+1}/{args.epochs} | {mode} loss: {np.mean(losses):.3f} | {mode} score: {score:.3f} | {mode} auc: {auc_score:.3f} | lr: {current_lr:.7f}")
     else:
