@@ -1,5 +1,6 @@
 data_dir: /kaggle/input/isic-2024-challenge
 image_dir: /kaggle/input/isic-2024-challenge/train-image/image
+train_df_dir:
 local_dir: 
 pretrain_dir:
 COLAB: False

@@ -145,7 +145,8 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
 def run(args: DictConfig): 
     set_seed(args.seed)
     
-    train = load_traindf_and_split(args)
+    train = pd.read_csv(args.train_df_dir)
+    #load_traindf_and_split(args)
     
     logdir = "/kaggle/working/" if not args.COLAB else hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
     
