@@ -43,7 +43,7 @@ class SkinCancerDataset(Dataset):
         self.isic_ids = self.df['isic_id'].values
         self.remove_hair_thresh = remove_hair_thresh
 
-        self.hdf_dir = "image.hdf5" if "all-isic-data" in args.data_dir else "train-image.hdf5"
+        self.hdf_dir = "isic_archive_gkf.hdf5" if "all-isic-data" in args.data_dir else "train-image.hdf5"
         if split in ["train", "val"]:
             self.fp_hdf = h5py.File(os.path.join(args.data_dir, self.hdf_dir), mode="r")
             self.targets = self.df['target'].values
