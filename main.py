@@ -233,17 +233,17 @@ def run(args: DictConfig):
                 #train mixup dataset
                 combo_loader = get_combo_loader(train_loader, base_sampling="instance")
                 #mixupの場合は、train_loader=combo_loader
-                _, _ , _ = run_one_epoch(combo_loader, model, optimizer, lr_scheduler, args, epoch, torch.nn.CrossEntropyLoss())
+                _, _ , _ = run_one_epoch(combo_loader, model, optimizer, lr_scheduler, args, epoch, torch.nn.BCEWithLogitsLoss())
             else:
-                train_loss, train_score, train_auc = run_one_epoch(train_loader, model, optimizer, lr_scheduler, args, epoch, torch.nn.CrossEntropyLoss())
+                train_loss, train_score, train_auc = run_one_epoch(train_loader, model, optimizer, lr_scheduler, args, epoch, torch.nn.BCEWithLogitsLoss())
 
             with torch.no_grad():
                 if args.do_mixup:
                     #ここで実際のTrainDataに対するロスを計算
-                    train_loss, train_score, train_auc = run_one_epoch(train_loader, model, None, None, args, epoch, torch.nn.CrossEntropyLoss())
-                    val_loss, val_score, val_auc = run_one_epoch(val_loader, model, None, None, args, epoch, torch.nn.CrossEntropyLoss())
+                    train_loss, train_score, train_auc = run_one_epoch(train_loader, model, None, None, args, epoch, torch.nn.BCEWithLogitsLoss())
+                    val_loss, val_score, val_auc = run_one_epoch(val_loader, model, None, None, args, epoch, torch.nn.BCEWithLogitsLoss())
                 else:
-                    val_loss, val_score, val_auc = run_one_epoch(val_loader, model,  None, None, args, epoch, torch.nn.CrossEntropyLoss())
+                    val_loss, val_score, val_auc = run_one_epoch(val_loader, model,  None, None, args, epoch, torch.nn.BCEWithLogitsLoss())
                 
             if args.use_wandb:
                 wandb.log({"train_loss": np.mean(train_loss), "train_score": np.mean(train_score), "train_auc": np.mean(train_auc), 
@@ -262,15 +262,15 @@ def run(args: DictConfig):
                     cprint("Early stopping.", "cyan")
                     break
 
-    if args.local_dir:
-        # Localにコピー
-        local_dir = os.path.join(args.local_dir, f"{args.expname}_{args.ver}")
-        os.makedirs(local_dir, exist_ok=True)
+        if args.local_dir:
+            # Localにコピー
+            local_dir = os.path.join(args.local_dir, f"{args.expname}_{args.ver}")
+            os.makedirs(local_dir, exist_ok=True)
 
-        model_path = os.path.join(logdir, f"model_best_fold{fold+1}.pt")
-        if os.path.exists(model_path):
-            shutil.copy(model_path, local_dir)
-            print(f'Model saved to Local: {local_dir}')
+            model_path = os.path.join(logdir, f"model_best_fold{fold+1}.pt")
+            if os.path.exists(model_path):
+                shutil.copy(model_path, local_dir)
+                print(f'Model saved to Local: {local_dir}')
 
 
 if __name__ == "__main__":
