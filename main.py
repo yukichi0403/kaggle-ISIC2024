@@ -138,6 +138,7 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
     all_preds = np.concatenate(all_preds, axis=0)
     all_labels = np.concatenate(all_labels, axis=0)
 
+
     # スコアとAUCを計算
     score, auc_score = calculate_pauc_and_auc(all_labels, all_preds)
     
@@ -156,6 +157,7 @@ def run(args: DictConfig):
     set_seed(args.seed)
     
     train = pd.read_csv(args.train_df_dir)
+    #train=sampling(train)
     #load_traindf_and_split(args)
     
     logdir = "/kaggle/working/" if not args.COLAB else hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
@@ -235,15 +237,15 @@ def run(args: DictConfig):
                 #train mixup dataset
                 combo_loader = get_combo_loader(train_loader, base_sampling="instance")
                 #mixupの場合は、train_loader=combo_loader
-                _, _ , _ = run_one_epoch(combo_loader, model, optimizer, lr_scheduler, args, epoch, torch.nn.BCEWithLogitsLoss())
+                _, _ , _ = run_one_epoch(combo_loader, model, optimizer, lr_scheduler, args, epoch, torch.nn.CrossEntropyLoss())
             else:
                 train_loss, train_score, train_auc = run_one_epoch(train_loader, model, optimizer, lr_scheduler, args, epoch, torch.nn.BCEWithLogitsLoss())
 
             with torch.no_grad():
                 if args.do_mixup:
                     #ここで実際のTrainDataに対するロスを計算
-                    train_loss, train_score, train_auc = run_one_epoch(train_loader, model, None, None, args, epoch, torch.nn.BCEWithLogitsLoss())
-                    val_loss, val_score, val_auc = run_one_epoch(val_loader, model, None, None, args, epoch, torch.nn.BCEWithLogitsLoss())
+                    train_loss, train_score, train_auc = run_one_epoch(train_loader, model, None, None, args, epoch, torch.nn.CrossEntropyLoss())
+                    val_loss, val_score, val_auc = run_one_epoch(val_loader, model, None, None, args, epoch, torch.nn.CrossEntropyLoss())
                 else:
                     val_loss, val_score, val_auc = run_one_epoch(val_loader, model,  None, None, args, epoch, torch.nn.BCEWithLogitsLoss())
                 
