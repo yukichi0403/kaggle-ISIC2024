@@ -43,6 +43,7 @@ class SkinCancerDataset(Dataset):
         self.df = df
         self.sampling_rate = args.sampling_rate
         if split=="train" and self.sampling_rate is not None:
+            print("Now sampling mode")
             self.df_positive = df[df["target"] == 1].reset_index()
             self.df_negative = df[df["target"] == 0].reset_index()
             self.targets_positive = self.df_positive['target'].values
@@ -60,14 +61,14 @@ class SkinCancerDataset(Dataset):
             self.fp_hdf = h5py.File(os.path.join(args.data_dir, "test-image.hdf5"), mode="r")
 
     def __len__(self) -> int:
-        if self.sampling_rate is not None:
+        if self.split=="train" and self.sampling_rate is not None:
             return int(-(-len(self.df_positive) // self.sampling_rate))
         else:
             return len(self.isic_ids)
 
     def __getitem__(self, i):
         #sampling
-        if self.sampling_rate is not None:
+        if self.split=="train" and self.sampling_rate is not None:
             if random.random() < self.sampling_rate:
                 df = self.df_positive
                 targets = self.targets_positive
