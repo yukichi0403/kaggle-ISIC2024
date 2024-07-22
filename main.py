@@ -82,6 +82,7 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
 
     train = optimizer is not None
     if train:
+        print("Training mode")
         model.train()
         current_lr = optimizer.param_groups[0]["lr"]
     else: 
@@ -151,6 +152,7 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
 
 @hydra.main(version_base=None, config_path="configs", config_name="config_finetuning")
 def run(args: DictConfig): 
+    print(args)
     set_seed(args.seed)
     
     train = pd.read_csv(args.train_df_dir)
