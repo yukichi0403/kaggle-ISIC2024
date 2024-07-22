@@ -36,28 +36,6 @@ def sampling(train, ratio=1):
     return balanced_df
 
 
-def load_traindf_and_split(args):
-    if "all-isic-data" in args.data_dir:
-        train = pd.read_csv(os.path.join(args.data_dir, "metadata.csv"))
-        train = train.dropna(subset="benign_malignant")
-        train = train.loc[train["benign_malignant"].isin(["benign", "malignant"]), :]
-        train["target"] = train["benign_malignant"].apply(lambda x: 1 if x=="malignant" else 0)
-    else:
-        train = pd.read_csv(os.path.join(args.data_dir, "train-metadata.csv"))
-
-    if args.sampling_test:
-        train = sampling(train)
-    if args.gkf:
-        skf = GroupKFold(n_splits = args.num_splits)
-        for fold, (_, val_index) in enumerate(skf.split(train,train[['target']], groups=train['patient_id'])):
-            train.loc[val_index, 'fold'] = fold
-    else:
-        skf = StratifiedKFold(n_splits = args.num_splits, shuffle=True, random_state=args.seed)
-        for fold, (_, val_index) in enumerate(skf.split(train,train[['target']])):
-            train.loc[val_index, 'fold'] = fold
-    
-    return train
-
 
 def cross_entropy_loss(input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     return -(input.log_softmax(dim=-1) * target).sum(dim=-1).mean()
@@ -73,6 +51,8 @@ def get_dataset_and_loader(loader_args, train_df, val_df, train_transforms, val_
                                   val_transforms, args.remove_hair_thresh  
                                  )
     val_loader = torch.utils.data.DataLoader(val_dataset, shuffle=False, **loader_args)  
+
+    print(f"Train size: {len(train_dataset)}, Val size: {len(val_dataset)}")
     
     return train_loader, val_loader
 
@@ -119,9 +99,11 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
             loss = loss_func(y_pred, labels)  # 修正: loss_funcを使用
             
         # 予測値とラベルを保存
-        if isinstance(loss_func, nn.BCEWithLogitsLoss) or isinstance(loss_func, nn.BCELoss):
+        if isinstance(loss_func, nn.BCEWithLogitsLoss):
             all_preds.append(y_pred.sigmoid().cpu().detach().numpy())
-        else:
+        elif isinstance(loss_func, nn.BCELoss):
+            all_preds.append(y_pred.cpu().detach().numpy())
+        elif isinstance(loss_func, nn.CrossEntropyLoss):
             all_preds.append(y_pred[:,1].cpu().detach().numpy())
         all_labels.append(labels.cpu().numpy())
 
@@ -192,7 +174,7 @@ def run(args: DictConfig):
         train_df = train[train["fold"] != fold]
         valid_df = train[train["fold"] == fold]
         
-        print(f"fold{fold+1}'s train shape: {train_df.shape[0]}, target ratio: {train_df['target'].mean()}. valid target ratio: {valid_df['target'].mean()}")
+        print(f"fold{fold+1}'s Target ratio: {train_df['target'].mean()}. valid target ratio: {valid_df['target'].mean()}")
 
         # ------------------
         #    Dataloader
@@ -208,6 +190,7 @@ def run(args: DictConfig):
                          pretrained=True, 
                          aux_loss_ratio= args.aux_loss_ratio, 
                          dropout_rate=args.dropout
+
         ).to(args.device)
 
         if args.pretrain_dir:
