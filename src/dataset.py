@@ -10,6 +10,7 @@ from PIL import Image
 from io import BytesIO
 import pandas as pd
 import cv2
+import random
 
 
 def remove_hair(image, threshold):
@@ -37,11 +38,19 @@ class SkinCancerDataset(Dataset):
         self.split = split
         if split != "test":
             self.dr = df["target"].values
-        self.num_classes = 2
         self.augs = augs
-        self.df = df
-        self.isic_ids = self.df['isic_id'].values
         self.remove_hair_thresh = remove_hair_thresh
+        self.df = df
+        self.sampling_rate = args.sampling_rate
+        if split=="train" and self.sampling_rate is not None:
+            self.df_positive = df[df["target"] == 1].reset_index()
+            self.df_negative = df[df["target"] == 0].reset_index()
+            self.targets_positive = self.df_positive['target'].values
+            self.targets_negative = self.df_negative['target'].values
+            self.isic_ids_positive = self.df_positive['isic_id'].values
+            self.isic_ids_negative = self.df_negative['isic_id'].values
+        else:
+            self.isic_ids = self.df['isic_id'].values
 
         self.hdf_dir = "image_256sq.hdf5" if "all-isic-data" in args.data_dir else "train-image.hdf5"
         if split in ["train", "val"]:
@@ -51,17 +60,34 @@ class SkinCancerDataset(Dataset):
             self.fp_hdf = h5py.File(os.path.join(args.data_dir, "test-image.hdf5"), mode="r")
 
     def __len__(self) -> int:
-        return len(self.isic_ids)
+        if self.sampling_rate is not None:
+            return int(-(-len(self.df_positive) // self.sampling_rate))
+        else:
+            return len(self.isic_ids)
 
     def __getitem__(self, i):
-        isic_id = self.isic_ids[i]
+        #sampling
+        if self.sampling_rate is not None:
+            if random.random() < self.sampling_rate:
+                df = self.df_positive
+                targets = self.targets_positive
+            else:
+                df = self.df_negative
+                targets = self.targets_negative
+            i = i % df.shape[0]
+        else:
+            df = self.df
+            targets = self.targets
+        
+        isic_id = df.iloc[i]['isic_id']
         X = np.array(Image.open(BytesIO(self.fp_hdf[isic_id][()])))
+
         if self.remove_hair_thresh > 0:            
             X = self.__remove_hair(X)
         if self.augs:
             X = self.__random_transform(X, self.augs)
         if self.split in ["train", "val"]:
-            return X, self.targets[i]
+            return X, targets[i]
         else:
             return X
     
