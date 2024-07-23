@@ -218,7 +218,8 @@ def run(args: DictConfig):
                          num_classes=args.num_classes, # write the number of classes
                          pretrained=True, 
                          aux_loss_ratio= args.aux_loss_ratio, 
-                         dropout_rate=args.dropout
+                         dropout_rate=args.dropout,
+                         gem_p=args.gem_p
 
         ).to(args.device)
 

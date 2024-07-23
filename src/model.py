@@ -27,13 +27,14 @@ class CustomModel(nn.Module):
                  num_classes: int = 0, # write the number of classes
                  pretrained: bool = True, 
                  aux_loss_ratio: float = None, 
-                 dropout_rate: float = 0):
+                 dropout_rate: float = 0,
+                 gem_p: float = 3):
         super(CustomModel, self).__init__()
         self.aux_loss_ratio = aux_loss_ratio
         self.encoder = timm.create_model(model_name, pretrained=pretrained,
                                           drop_path_rate=dropout_rate)
         self.features = nn.Sequential(*list(self.encoder.children())[:-2])
-        self.GeM = GeM()
+        self.GeM = GeM(p=gem_p)
         self.decoder = nn.Sequential(
             nn.Flatten(),
             nn.Dropout(dropout_rate),
