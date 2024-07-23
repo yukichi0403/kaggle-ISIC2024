@@ -11,7 +11,6 @@ sampling_rate: 0.5
 
 model_name: tf_efficientnet_b0.ns_jft_in1k
 num_classes: 2
-dropout: 0.1
 aux_loss_ratio:
 gem_p: 3
 drop_path_rate: 0.1

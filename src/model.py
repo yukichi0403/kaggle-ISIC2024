@@ -35,30 +35,30 @@ class CustomModel(nn.Module):
         self.GeM = GeM(p=args.gem_p)
         self.flatten = nn.Flatten()
         self.dropout_main = nn.ModuleList([
-			nn.Dropout(args.dropout_rate) for _ in range(5)
+			nn.Dropout(args.dropout) for _ in range(5)
 		]) #droupout augmentation
         self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
 
         if args.aux_loss_ratio is not None:
             self.decoder_aux = nn.Flatten()
             self.dropout_aux = nn.ModuleList([
-			nn.Dropout(args.dropout_rate) for _ in range(5)
+			nn.Dropout(args.dropout) for _ in range(5)
 		]) #droupout augmentation
             self.linear_aux = nn.Linear(self.encoder.num_features, 4)
 
     def forward(self, images):
         out = self.features(images)
-        out = self.flatten(out)
         out = self.GeM(out)
+        out = self.flatten(out)
         if self.training:
             main_out=0
             for i in range(len(self.dropout_main)):
-                main_out += self.target(self.dropout_main[i](out))
+                main_out += self.linear_main(self.dropout_main[i](out))
             main_out = main_out/len(self.dropout_main)
             if self.aux_loss_ratio is not None:
                 out_aux=0
                 for i in range(len(self.dropout_aux)):
-                    out_aux += self.target(self.dropout_aux[i](out))
+                    out_aux += self.linear_aux(self.dropout_aux[i](out))
                 out_aux = out_aux/len(self.dropout_aux)
                 return main_out, out_aux
         else:
