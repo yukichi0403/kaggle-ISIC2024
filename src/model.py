@@ -23,37 +23,45 @@ class GeM(nn.Module):
     
 class CustomModel(nn.Module):
     def __init__(self, 
-                 model_name, 
-                 num_classes: int = 0, # write the number of classes
-                 pretrained: bool = True, 
-                 aux_loss_ratio: float = None, 
-                 dropout_rate: float = 0,
-                 gem_p: float = 3):
+                 args,
+                 training: bool = True, 
+                 ):
         super(CustomModel, self).__init__()
-        self.aux_loss_ratio = aux_loss_ratio
-        self.encoder = timm.create_model(model_name, pretrained=pretrained,
-                                          drop_path_rate=dropout_rate)
+        self.aux_loss_ratio = args.aux_loss_ratio
+        self.training = training
+        self.encoder = timm.create_model(args.model_name, pretrained=self.training,
+                                          drop_path_rate=args.drop_path_rate)
         self.features = nn.Sequential(*list(self.encoder.children())[:-2])
-        self.GeM = GeM(p=gem_p)
-        self.decoder = nn.Sequential(
-            nn.Flatten(),
-            nn.Dropout(dropout_rate),
-            nn.Linear(self.encoder.num_features, num_classes)
-        )
-        if aux_loss_ratio is not None:
-            self.decoder_aux = nn.Sequential(
-                nn.Flatten(),
-                nn.Dropout(dropout_rate),
-                nn.Linear(self.encoder.num_features, 4)
-                )
+        self.GeM = GeM(p=args.gem_p)
+        self.flatten = nn.Flatten()
+        self.dropout_main = nn.ModuleList([
+			nn.Dropout(args.dropout_rate) for _ in range(5)
+		]) #droupout augmentation
+        self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+
+        if args.aux_loss_ratio is not None:
+            self.decoder_aux = nn.Flatten()
+            self.dropout_aux = nn.ModuleList([
+			nn.Dropout(args.dropout_rate) for _ in range(5)
+		]) #droupout augmentation
+            self.linear_aux = nn.Linear(self.encoder.num_features, 4)
 
     def forward(self, images):
         out = self.features(images)
+        out = self.flatten(out)
         out = self.GeM(out)
-        main_out = self.decoder(out.view(out.size(0), -1))
-        
-        if self.aux_loss_ratio is not None:
-            out_aux = self.decoder_aux(out.view(out.size(0), -1))
-            return main_out, out_aux
+        if self.training:
+            main_out=0
+            for i in range(len(self.dropout_main)):
+                main_out += self.target(self.dropout_main[i](out))
+            main_out = main_out/len(self.dropout_main)
+            if self.aux_loss_ratio is not None:
+                out_aux=0
+                for i in range(len(self.dropout_aux)):
+                    out_aux += self.target(self.dropout_aux[i](out))
+                out_aux = out_aux/len(self.dropout_aux)
+                return main_out, out_aux
         else:
-            return main_out
+            main_out = self.linear_main(out)
+        
+        return main_out

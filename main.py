@@ -140,7 +140,6 @@ def run(args: DictConfig):
     
     train = pd.read_csv(args.train_df_dir)
     #train=sampling(train)
-    #load_traindf_and_split(args)
     
     logdir = "/kaggle/working/" if not args.COLAB else hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
     print(f"logdir: {logdir}")
@@ -214,13 +213,8 @@ def run(args: DictConfig):
         #       Model
         # ------------------
         model = CustomModel(
-                         model_name=args.model_name,
-                         num_classes=args.num_classes, # write the number of classes
-                         pretrained=True, 
-                         aux_loss_ratio= args.aux_loss_ratio, 
-                         dropout_rate=args.dropout,
-                         gem_p=args.gem_p
-
+                         args,
+                         training=True
         ).to(args.device)
 
         if args.pretrain_dir:
