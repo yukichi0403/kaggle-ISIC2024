@@ -245,9 +245,9 @@ def run(args: DictConfig):
                 if args.weighted_loss:
                     if args.weighted_loss:
                         # pos_weight は target==1 のサンプルの比率で重み付けします
-                        pos_weight = torch.tensor([1.0 - args.sampling_rate / args.sampling_rate])
+                        pos_weight = torch.tensor([(1.0 - args.sampling_rate) / args.sampling_rate])
                     else:
-                        pos_weight = torch.tensor([1.0 - target_ratio / target_ratio])
+                        pos_weight = torch.tensor([(1.0 - target_ratio) / target_ratio])
                     print(f"Using weighted loss. pos_weight: {pos_weight}")
                     loss_func = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
                 else:
