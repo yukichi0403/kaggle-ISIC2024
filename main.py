@@ -150,6 +150,7 @@ def run(args: DictConfig):
         
     loader_args = {"batch_size": args.batch_size, "num_workers": args.num_workers}
     train_transform = A.Compose([  
+                                    A.Resize(args.img_size, args.img_size),
                                     A.Flip(p=0.5),                      
                                     A.Transpose(p=0.5),
 
@@ -178,7 +179,6 @@ def run(args: DictConfig):
                                                                         rotate_limit=60, 
                                                                         p=0.5),
                                     
-                                    A.Resize(args.img_size, args.img_size),
                                     A.Normalize(
                                         mean=[0.485, 0.456, 0.406], 
                                         std=[0.229, 0.224, 0.225], 
