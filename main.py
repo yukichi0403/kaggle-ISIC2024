@@ -202,7 +202,8 @@ def run(args: DictConfig):
         train_df = train[train["fold"] != fold]
         valid_df = train[train["fold"] == fold]
         
-        print(f"fold{fold+1}'s Target ratio: {train_df['target'].mean()}. valid target ratio: {valid_df['target'].mean()}")
+        target_ratio = train_df['target'].mean()
+        print(f"fold{fold+1}'s Target ratio: {target_ratio}. valid target ratio: {valid_df['target'].mean()}")
 
         # ------------------
         #    Dataloader
@@ -219,6 +220,7 @@ def run(args: DictConfig):
 
         if args.pretrain_dir:
             model.load_state_dict(torch.load(os.path.join(args.pretrain_dir, f"model_best_fold{fold+1}.pt"), map_location=args.device))
+            print(f"Loaded pretrained model from {args.pretrain_dir}")
 
         # ------------------
         #     Optimizer
@@ -239,22 +241,35 @@ def run(args: DictConfig):
 
             train_loss, train_acc, val_loss, val_acc = [], [], [], []
             current_lr = optimizer.param_groups[0]["lr"]
+            if not args.do_mixup:
+                if args.weighted_loss:
+                    if args.weighted_loss:
+                        # pos_weight は target==1 のサンプルの比率で重み付けします
+                        pos_weight = torch.tensor([1.0 - args.sampling_rate / args.sampling_rate])
+                    else:
+                        pos_weight = torch.tensor([1.0 - target_ratio / target_ratio])
+                    print(f"Using weighted loss. pos_weight: {pos_weight}")
+                    loss_func = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+                else:
+                    loss_func = torch.nn.BCEWithLogitsLoss()
+            else:
+                loss_func = torch.nn.CrossEntropyLoss()
             
             if args.do_mixup:   
                 #train mixup dataset
                 combo_loader = get_combo_loader(train_loader, base_sampling="instance")
                 #mixupの場合は、train_loader=combo_loader
-                _, _ , _ = run_one_epoch(combo_loader, model, optimizer, lr_scheduler, args, epoch, torch.nn.CrossEntropyLoss())
+                _, _ , _ = run_one_epoch(combo_loader, model, optimizer, lr_scheduler, args, epoch, loss_func)
             else:
-                train_loss, train_score, train_auc = run_one_epoch(train_loader, model, optimizer, lr_scheduler, args, epoch, torch.nn.BCEWithLogitsLoss())
+                train_loss, train_score, train_auc = run_one_epoch(train_loader, model, optimizer, lr_scheduler, args, epoch, loss_func)
 
             with torch.no_grad():
                 if args.do_mixup:
                     #ここで実際のTrainDataに対するロスを計算
-                    train_loss, train_score, train_auc = run_one_epoch(train_loader, model, None, None, args, epoch, torch.nn.CrossEntropyLoss())
-                    val_loss, val_score, val_auc = run_one_epoch(val_loader, model, None, None, args, epoch, torch.nn.CrossEntropyLoss())
+                    train_loss, train_score, train_auc = run_one_epoch(train_loader, model, None, None, args, epoch, loss_func)
+                    val_loss, val_score, val_auc = run_one_epoch(val_loader, model, None, None, args, epoch, loss_func)
                 else:
-                    val_loss, val_score, val_auc = run_one_epoch(val_loader, model,  None, None, args, epoch, torch.nn.BCEWithLogitsLoss())
+                    val_loss, val_score, val_auc = run_one_epoch(val_loader, model,  None, None, args, epoch, loss_func)
                 
             if args.use_wandb:
                 wandb.log({"train_loss": np.mean(train_loss), "train_score": np.mean(train_score), "train_auc": np.mean(train_auc), 
