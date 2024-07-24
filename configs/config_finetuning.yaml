@@ -27,7 +27,7 @@ do_mixup: True
 
 device: cuda:0
 num_workers: 4
-seed: 1234
+seed: 42
 use_wandb: False
 
 img_size: 256
