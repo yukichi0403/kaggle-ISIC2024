@@ -31,13 +31,14 @@ class CustomModel(nn.Module):
         self.training = training
         self.encoder = timm.create_model(args.model_name, pretrained=self.training,
                                           drop_path_rate=args.drop_path_rate)
-        self.features = nn.Sequential(*list(self.encoder.children())[:-2])
+        self.encoder.classifier = nn.Identity()
+        self.encoder.global_pool = nn.Identity()
         self.GeM = GeM(p=args.gem_p)
         self.flatten = nn.Flatten()
         self.dropout_main = nn.ModuleList([
 			nn.Dropout(args.dropout) for _ in range(5)
 		]) #droupout augmentation
-        self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+        self.linear_main = nn.Linear(self.encoder.classifier.in_features, args.num_classes)
 
         if args.aux_loss_ratio is not None:
             self.decoder_aux = nn.Flatten()
@@ -47,7 +48,7 @@ class CustomModel(nn.Module):
             self.linear_aux = nn.Linear(self.encoder.num_features, 4)
 
     def forward(self, images):
-        out = self.features(images)
+        out = self.encoder(images)
         out = self.GeM(out)
         out = self.flatten(out)
         if self.training:
