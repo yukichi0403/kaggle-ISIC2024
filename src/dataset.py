@@ -53,9 +53,11 @@ class SkinCancerDataset(Dataset):
         else:
             self.isic_ids = self.df['isic_id'].values
 
-        self.hdf_dir = "image_384sq.hdf5" if "all-isic-data" in args.data_dir else "train-image.hdf5"
+        self.hdf_dir = "train-image.hdf5"
+        self.hdf_dir_archive = f"image_{args.img_size}sq.hdf5"
         if split in ["train", "val"]:
             self.fp_hdf = h5py.File(os.path.join(args.data_dir, self.hdf_dir), mode="r")
+            self.fp_hdf_archive = h5py.File(os.path.join(args.data_dir_archive, self.hdf_dir_archive), mode="r")
             self.targets = self.df['target'].values
         else:
             self.fp_hdf = h5py.File(os.path.join(args.data_dir, "test-image.hdf5"), mode="r")
@@ -81,7 +83,9 @@ class SkinCancerDataset(Dataset):
             targets = self.targets
         
         isic_id = df.iloc[i]['isic_id']
-        X = np.array(Image.open(BytesIO(self.fp_hdf[isic_id][()])))
+        archive = df.iloc[i]['archive']
+        if archive:X = np.array(Image.open(BytesIO(self.fp_hdf_archive[isic_id][()])))
+        else:X = np.array(Image.open(BytesIO(self.fp_hdf[isic_id][()])))
 
         # #JPEGversion
         # img_path = os.path.join(self.args.image_dir, isic_id+".jpg")
@@ -107,10 +111,12 @@ class SkinCancerDataset(Dataset):
 
     @property
     def num_channels(self) -> int:
-        sample_image = np.array(Image.open(BytesIO(self.fp_hdf[self.isic_ids[0]][()])))
+        if self.split in ["train", "val"]:sample_image = np.array(Image.open(BytesIO(self.fp_hdf[self.isic_ids[0]][()])))
+        else:sample_image = np.array(Image.open(BytesIO(self.fp_hdf_archive[self.isic_ids[0]][()])))
         return sample_image.shape[2]
 
     @property
     def seq_len(self) -> int:
-        sample_image = np.array(Image.open(BytesIO(self.fp_hdf[self.isic_ids[0]][()])))
+        if self.split in ["train", "val"]:sample_image = np.array(Image.open(BytesIO(self.fp_hdf[self.isic_ids[0]][()])))
+        else:sample_image = np.array(Image.open(BytesIO(self.fp_hdf_archive[self.isic_ids[0]][()])))
         return sample_image.shape[0]
