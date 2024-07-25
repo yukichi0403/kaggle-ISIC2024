@@ -59,8 +59,9 @@ class SkinCancerDataset(Dataset):
         self.image_dir = args.image_dir
         self.archive_image_dir = args.archive_image_dir
         if split in ["train", "val"]:
-            self.fp_hdf = h5py.File(os.path.join(args.data_dir, self.hdf_dir), mode="r")
-            self.fp_hdf_archive = h5py.File(os.path.join(args.data_dir_archive, self.hdf_dir_archive), mode="r")
+            if not self.use_JPEG:
+                self.fp_hdf = h5py.File(os.path.join(args.data_dir, self.hdf_dir), mode="r")
+                self.fp_hdf_archive = h5py.File(os.path.join(args.data_dir_archive, self.hdf_dir_archive), mode="r")
             self.targets = self.df['target'].values
         else:
             self.fp_hdf = h5py.File(os.path.join(args.data_dir, "test-image.hdf5"), mode="r")
