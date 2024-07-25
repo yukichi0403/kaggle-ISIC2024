@@ -50,8 +50,7 @@ class CustomModel(nn.Module):
 
     def forward(self, images):
         out = self.encoder(images)
-        out = self.GeM(out)
-        out = self.flatten(out)
+        out = self.GeM(out).flatten(1)
         if self.training:
             main_out=0
             for i in range(len(self.dropout_main)):

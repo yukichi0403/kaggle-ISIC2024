@@ -225,9 +225,8 @@ def run(args: DictConfig):
         # ------------------
         #     Optimizer
         # ------------------
-        optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
-        train_size = len(train_loader)*args.batch_size
-        lr_scheduler = get_scheduler(args, optimizer, train_size=train_size)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        lr_scheduler = get_scheduler(args, optimizer, len(train_loader))
     
     
         # ------------------
@@ -245,9 +244,9 @@ def run(args: DictConfig):
                 if args.weighted_loss:
                     if args.weighted_loss:
                         # pos_weight は target==1 のサンプルの比率で重み付けします
-                        pos_weight = torch.tensor([(1.0 - args.sampling_rate) / args.sampling_rate])
+                        pos_weight = torch.tensor([(1.0 - args.sampling_rate) / args.sampling_rate]).to(args.device)
                     else:
-                        pos_weight = torch.tensor([(1.0 - target_ratio) / target_ratio])
+                        pos_weight = torch.tensor([(1.0 - target_ratio) / target_ratio]).to(args.device)
                     print(f"Using weighted loss. pos_weight: {pos_weight}")
                     loss_func = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
                 else:
