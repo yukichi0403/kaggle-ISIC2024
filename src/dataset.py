@@ -42,6 +42,7 @@ class SkinCancerDataset(Dataset):
         self.remove_hair_thresh = remove_hair_thresh
         self.df = df
         self.sampling_rate = args.sampling_rate
+        self.use_JPEG = args.use_JPEG
         if split=="train" and self.sampling_rate is not None:
             print("Now sampling mode")
             self.df_positive = df[df["target"] == 1].reset_index()
@@ -55,6 +56,8 @@ class SkinCancerDataset(Dataset):
 
         self.hdf_dir = "train-image.hdf5"
         self.hdf_dir_archive = f"image_{args.img_size}sq.hdf5"
+        self.image_dir = args.image_dir
+        self.archive_image_dir = args.archive_image_dir
         if split in ["train", "val"]:
             self.fp_hdf = h5py.File(os.path.join(args.data_dir, self.hdf_dir), mode="r")
             self.fp_hdf_archive = h5py.File(os.path.join(args.data_dir_archive, self.hdf_dir_archive), mode="r")
@@ -84,13 +87,16 @@ class SkinCancerDataset(Dataset):
         
         isic_id = df.iloc[i]['isic_id']
         archive = df.iloc[i]['archive']
-        if archive:X = np.array(Image.open(BytesIO(self.fp_hdf_archive[isic_id][()])))
-        else:X = np.array(Image.open(BytesIO(self.fp_hdf[isic_id][()])))
-
-        # #JPEGversion
-        # img_path = os.path.join(self.args.image_dir, isic_id+".jpg")
-        # X = cv2.imread(img_path)
-        # X = cv2.cvtColor(X, cv2.COLOR_BGR2RGB)
+        if not self.use_JPEG:
+            if archive:X = np.array(Image.open(BytesIO(self.fp_hdf_archive[isic_id][()])))
+            else:X = np.array(Image.open(BytesIO(self.fp_hdf[isic_id][()])))
+        else:
+            if archive:
+                img_path = os.path.join(self.archive_image_dir, isic_id+".jpg")
+            else:
+                img_path = os.path.join(self.image_dir, isic_id+".jpg")
+            X = cv2.imread(img_path)
+            X = cv2.cvtColor(X, cv2.COLOR_BGR2RGB)
 
         if self.remove_hair_thresh > 0:            
             X = self.__remove_hair(X)
