@@ -196,7 +196,7 @@ def run(args: DictConfig):
                         ToTensorV2()])
         
     for fold in range(args.num_splits):
-        if args.test and fold > 0:
+        if args.test and fold != 1:
             print(f"Test mode. Skipping fold{fold+1}")
             continue
         train_df = train[train["fold"] != fold]
