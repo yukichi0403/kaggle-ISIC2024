@@ -275,8 +275,6 @@ def run(args: DictConfig):
                 wandb.log({"train_loss": np.mean(train_loss), "train_score": np.mean(train_score), "train_auc": np.mean(train_auc), 
                            "val_loss": np.mean(val_loss), "val_score": np.mean(val_score), "val_auc": np.mean(val_auc),
                            "lr": current_lr})
-                
-                wandb.finish()
 
             if np.mean(val_score) > max_val_score:
                 cprint("New best.", "cyan")
@@ -299,6 +297,9 @@ def run(args: DictConfig):
             if os.path.exists(model_path):
                 shutil.copy(model_path, local_dir)
                 print(f'Model saved to Local: {local_dir}')
+        
+        if args.use_wandb:
+            wandb.finish()
 
 
 if __name__ == "__main__":
