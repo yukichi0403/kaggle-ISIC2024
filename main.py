@@ -66,6 +66,7 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
         model.train()
         current_lr = optimizer.param_groups[0]["lr"]
     else: 
+        print("Validation mode")
         model.eval()
     
     mode = "Train" if train else "Validation"
@@ -143,10 +144,6 @@ def run(args: DictConfig):
     
     logdir = "/kaggle/working/" if not args.COLAB else hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
     print(f"logdir: {logdir}")
-    
-    if args.use_wandb:
-        wandb.init(mode="online", dir=logdir, project="ISIC2024")
-        
         
     loader_args = {"batch_size": args.batch_size, "num_workers": args.num_workers}
     train_transform = A.Compose([  
@@ -199,6 +196,10 @@ def run(args: DictConfig):
         if args.test and fold != 0:
             print(f"Test mode. Skipping fold{fold+1}")
             continue
+        
+        if args.use_wandb:
+            wandb.init(mode="online", dir=logdir, project="ISIC2024")
+
         train_df = train[train["fold"] != fold]
         valid_df = train[train["fold"] == fold]
         
@@ -274,6 +275,8 @@ def run(args: DictConfig):
                 wandb.log({"train_loss": np.mean(train_loss), "train_score": np.mean(train_score), "train_auc": np.mean(train_auc), 
                            "val_loss": np.mean(val_loss), "val_score": np.mean(val_score), "val_auc": np.mean(val_auc),
                            "lr": current_lr})
+                
+                wandb.finish()
 
             if np.mean(val_score) > max_val_score:
                 cprint("New best.", "cyan")
