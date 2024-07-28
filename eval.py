@@ -329,9 +329,14 @@ class args():
     use_JPEG=False
 
 
+# For descriptive error messages
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+import sys
+BEST_WEIGHT = sys.argv[1]
+print(f"BEST_WEIGHT = {BEST_WEIGHT}")
 
 # inference
-preds = inference(args, model_dir)
+preds = inference(args, BEST_WEIGHT)
 
 df_sub = pd.read_csv("/kaggle/input/isic-2024-challenge/sample_submission.csv")
 df_sub["target"] = preds
