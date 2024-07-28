@@ -82,22 +82,26 @@ class SkinCancerDataset(Dataset):
                 df = self.df_negative
                 targets = self.targets_negative
             i = i % df.shape[0]
-        else:
+        elif self.split=="train" or self.split=="val":
             df = self.df
             targets = self.targets
+        else:
+            df = self.df
         
         isic_id = df.iloc[i]['isic_id']
-        archive = df.iloc[i]['archive']
-        if not self.use_JPEG:
-            if archive:X = np.array(Image.open(BytesIO(self.fp_hdf_archive[isic_id][()])))
-            else:X = np.array(Image.open(BytesIO(self.fp_hdf[isic_id][()])))
-        else:
-            if archive:
-                img_path = os.path.join(self.archive_image_dir, isic_id+".jpg")
-            else:
-                img_path = os.path.join(self.image_dir, isic_id+".jpg")
+        if self.split != "test":archive = df.iloc[i]['archive']
+            
+        if self.use_JPEG:
+            if archive:img_path = os.path.join(self.archive_image_dir, isic_id+".jpg")
+            else:img_path = os.path.join(self.image_dir, isic_id+".jpg")
             X = cv2.imread(img_path)
             X = cv2.cvtColor(X, cv2.COLOR_BGR2RGB)
+        else: #testの場合は全てhdf
+            if self.split != "test" and archive:
+                X = np.array(Image.open(BytesIO(self.fp_hdf_archive[isic_id][()])))
+            else:
+                X = np.array(Image.open(BytesIO(self.fp_hdf[isic_id][()])))
+        
 
         if self.remove_hair_thresh > 0:            
             X = self.__remove_hair(X)
