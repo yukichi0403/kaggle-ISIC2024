@@ -55,7 +55,7 @@ class SkinCancerDataset(Dataset):
             self.isic_ids = self.df['isic_id'].values
 
         self.hdf_dir = "train-image.hdf5"
-        self.hdf_dir_archive = f"image_{args.img_size}sq.hdf5"
+        self.hdf_dir_archive = f"image_384sq.hdf5"
         self.image_dir = args.image_dir
         self.archive_image_dir = args.archive_image_dir
         if split in ["train", "val"]:
