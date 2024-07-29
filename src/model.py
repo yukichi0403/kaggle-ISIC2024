@@ -2,7 +2,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import timm
+from timm.layers.adaptive_avgmax_pool import SelectAdaptivePool2d
 
+
+#######################
+#### EfficientNet
+#######################
 class GeM(nn.Module):
     def __init__(self, p=3, eps=1e-6):
         super(GeM, self).__init__()
@@ -20,7 +25,6 @@ class GeM(nn.Module):
                 '(' + 'p=' + '{:.4f}'.format(self.p.data.tolist()[0]) + \
                 ', ' + 'eps=' + str(self.eps) + ')'
 
-    
 class CustomModel(nn.Module):
     def __init__(self, 
                  args,
@@ -69,7 +73,9 @@ class CustomModel(nn.Module):
     
 
 
-
+#######################
+#### Eva02
+#######################
 class CustomModelEva(nn.Module):
     def __init__(self, 
                  args,
@@ -113,7 +119,9 @@ class CustomModelEva(nn.Module):
 
 
 
-
+#######################
+#### ConvNext
+#######################
 class LayerNorm2d(nn.Module):
     def __init__(self, num_features):
         super(LayerNorm2d, self).__init__()
@@ -160,4 +168,46 @@ class CustomConvNextModel(nn.Module):
         else:
             main_out = self.linear_main(out)
         
+        return main_out
+    
+
+
+#######################
+#### Swin
+#######################
+class CustomSwinModel(nn.Module):
+    def __init__(self, args, training: bool = True):
+        super(CustomSwinModel, self).__init__()
+        self.aux_loss_ratio = args.aux_loss_ratio
+        self.training = training
+        self.encoder = timm.create_model(args.model_name, pretrained=training,
+                                         drop_path_rate=args.drop_path_rate)
+        self.features = nn.Sequential(*list(self.encoder.children())[:-1])
+        self.GAP = SelectAdaptivePool2d(pool_type='avg', input_fmt='NHWC',flatten=True)
+        self.dropout_main = nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)])  # Dropout augmentation
+        self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+
+        if self.aux_loss_ratio is not None:
+            self.dropout_aux = nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)])  # Dropout augmentation
+            self.linear_aux = nn.Linear(self.encoder.num_features, 4)
+
+    def forward(self, images):
+        out = self.features(images)
+        out = self.GAP(out)
+
+        if self.training:
+            main_out = 0
+            for i in range(len(self.dropout_main)):
+                main_out += self.linear_main(self.dropout_main[i](out))
+            main_out = main_out / len(self.dropout_main)
+
+            if self.aux_loss_ratio is not None:
+                out_aux = 0
+                for i in range(len(self.dropout_aux)):
+                    out_aux += self.linear_aux(self.dropout_aux[i](out))
+                out_aux = out_aux / len(self.dropout_aux)
+                return main_out, out_aux
+        else:
+            main_out = self.linear_main(out)
+
         return main_out
