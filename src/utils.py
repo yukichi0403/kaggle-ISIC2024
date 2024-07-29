@@ -5,6 +5,8 @@ import cv2
 from timm.scheduler import CosineLRScheduler
 from sklearn.metrics import roc_curve, roc_auc_score, auc
 from torch.optim import lr_scheduler
+import pandas as pd
+
 
 
 
@@ -43,26 +45,12 @@ def get_scheduler(args, optimizer, steps_by_epoch):
 
 
 #metric
-def calculate_pauc_and_auc(y_true, y_scores, tpr_threshold=0.8):
-    # Calculate ROC curve
-    fpr, tpr, thresholds = roc_curve(y_true, y_scores)
-    auc_score = roc_auc_score(y_true, y_scores)
-    
-    # Create a mask for TPR values above the threshold
-    mask = tpr >= tpr_threshold
-    
-    # Apply the mask to fpr and tpr
-    fpr_above_threshold = fpr[mask]
-    tpr_above_threshold = tpr[mask]
-
-    # Check if there are at least 2 points to compute AUC
-    if len(fpr_above_threshold) < 2:
-        return 0.0, auc_score, fpr, tpr, fpr_above_threshold, tpr_above_threshold
-    
-    # Calculate the partial AUC
-    partial_auc = auc(fpr_above_threshold, tpr_above_threshold)
-    
-    # Normalize the partial AUC
-    pauc = partial_auc * (1 - tpr_threshold)
-    
-    return pauc, auc_score
+def comp_score(solution: pd.DataFrame, submission: pd.DataFrame, min_tpr: float=0.80):
+    v_gt = abs(np.asarray(solution.values)-1)
+    v_pred = np.array([1.0 - x for x in submission.values])
+    max_fpr = abs(1-min_tpr)
+    partial_auc_scaled = roc_auc_score(v_gt, v_pred, max_fpr=max_fpr)
+    # change scale from [0.5, 1.0] to [0.5 * max_fpr**2, max_fpr]
+    # https://math.stackexchange.com/questions/914823/shift-numbers-into-a-different-range
+    partial_auc = 0.5 * max_fpr**2 + (max_fpr - 0.5 * max_fpr**2) / (1.0 - 0.5) * (partial_auc_scaled - 0.5)
+    return partial_auc

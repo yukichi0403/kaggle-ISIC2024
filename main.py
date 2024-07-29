@@ -71,7 +71,7 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
     
     mode = "Train" if train else "Validation"
     for batch in tqdm(loader, desc=mode):
-        
+
         if train and args.do_mixup:
             lam = np.random.beta(a=args.do_mixup, b=1)
 
@@ -123,7 +123,7 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
 
 
     # スコアとAUCを計算
-    score, auc_score = calculate_pauc_and_auc(all_labels, all_preds)
+    score, auc_score = comp_score(pd.DataFrame(all_labels), pd.DataFrame(all_preds))
     
     if train:
         print(f"Epoch {epoch+1}/{args.epochs} | {mode} loss: {np.mean(losses):.3f} | {mode} score: {score:.3f} | {mode} auc: {auc_score:.3f} | lr: {current_lr:.7f}")
