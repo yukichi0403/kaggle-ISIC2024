@@ -214,7 +214,7 @@ def run(args: DictConfig):
         # ------------------
         #       Model
         # ------------------
-        model = CustomModel(
+        model = CustomModelEva(
                          args,
                          training=True
         ).to(args.device)
