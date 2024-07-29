@@ -110,3 +110,54 @@ class CustomModelEva(nn.Module):
             main_out = self.linear_main(out)
         
         return main_out
+
+
+
+
+class LayerNorm2d(nn.Module):
+    def __init__(self, num_features):
+        super(LayerNorm2d, self).__init__()
+        self.layer_norm = nn.LayerNorm([num_features, 1, 1])
+
+    def forward(self, x):
+        return self.layer_norm(x)
+
+class CustomConvNextModel(nn.Module):
+    def __init__(self, args, training: bool = True):
+        super(CustomConvNextModel, self).__init__()
+        self.aux_loss_ratio = args.aux_loss_ratio
+        self.training = training
+        self.encoder = timm.create_model(args.model_name, pretrained=training,
+                                         drop_path_rate=args.drop_path_rate)
+        self.features = nn.Sequential(*list(self.encoder.children())[:-2])
+        self.GAP = nn.AdaptiveAvgPool2d(1)
+        self.layer_norm = LayerNorm2d(self.encoder.num_features)
+        self.flatten = nn.Flatten()
+        self.dropout_main = nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)])  # Dropout augmentation
+        self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+
+        if self.aux_loss_ratio is not None:
+            self.dropout_aux = nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)])  # Dropout augmentation
+            self.linear_aux = nn.Linear(self.encoder.num_features, 4)
+
+    def forward(self, images):
+        out = self.features(images)
+        out = self.GAP(out)
+        out = self.flatten(out)
+
+        if self.training:
+            main_out = 0
+            for i in range(len(self.dropout_main)):
+                main_out += self.linear_main(self.dropout_main[i](out))
+            main_out = main_out / len(self.dropout_main)
+
+            if self.aux_loss_ratio is not None:
+                out_aux = 0
+                for i in range(len(self.dropout_aux)):
+                    out_aux += self.linear_aux(self.dropout_aux[i](out))
+                out_aux = out_aux / len(self.dropout_aux)
+                return main_out, out_aux     
+        else:
+            main_out = self.linear_main(out)
+        
+        return main_out
