@@ -20,6 +20,7 @@ from src.utils import *
 from src.dataset import SkinCancerDataset
 from src.combo_loader import get_combo_loader
 from src.model import *
+from src.feature_engeneering import *
 
 import torch.nn as nn
 
@@ -159,6 +160,7 @@ def run(args: DictConfig):
     set_seed(args.seed)
     
     train = pd.read_csv(args.train_df_dir)
+    train ,_ ,_ = feature_engeneering(train)
     #train=sampling(train)
     
     logdir = "/kaggle/working/" if not args.COLAB else hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
@@ -212,7 +214,7 @@ def run(args: DictConfig):
                         ToTensorV2()])
         
     for fold in range(args.num_splits):
-        if args.test and fold > 1:
+        if args.test and fold > 0:
             print(f"Test mode. Skipping fold{fold+1}")
             continue
         
