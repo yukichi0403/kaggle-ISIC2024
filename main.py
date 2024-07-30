@@ -21,6 +21,8 @@ from src.dataset import SkinCancerDataset
 from src.combo_loader import get_combo_loader
 from src.model import *
 
+import torch.nn as nn
+
 # Classのサンプル数のバランスを取るための関数
 def sampling(train, ratio=1):
     malignant_df = train[train['target'] == 1].copy()
@@ -72,7 +74,10 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
     mode = "Train" if train else "Validation"
     for batch in tqdm(loader, desc=mode):
 
-        if train and args.do_mixup:
+        if args.aux_loss_features is not None:
+            inputs, labels, aux_features = batch[0].to(args.device), batch[1].squeeze().to(args.device), batch[2]
+
+        elif train and args.do_mixup:
             lam = np.random.beta(a=args.do_mixup, b=1)
 
             inputs, labels = batch[0][0], batch[0][1]
@@ -105,7 +110,7 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
         # 補助損失の計算
         if args.aux_loss_ratio:
             for i, (aux_out, aux_feature, aux_weight) in enumerate(zip(aux_outs, args.aux_loss_features, args.aux_loss_ratio)):
-                aux_labels = args.aux_features[aux_feature]
+                aux_labels = aux_features[aux_feature].to(args.device)
                 if args.aux_task_reg[i]:  # 回帰タスクの場合
                     loss += nn.MSELoss()(aux_out, aux_labels) * aux_weight
                 else:  # 分類タスクの場合
@@ -205,7 +210,7 @@ def run(args: DictConfig):
                         ToTensorV2()])
         
     for fold in range(args.num_splits):
-        if args.test and fold != 0:
+        if args.test and fold > 1:
             print(f"Test mode. Skipping fold{fold+1}")
             continue
         
@@ -226,13 +231,13 @@ def run(args: DictConfig):
         # ------------------
         #       Model
         # ------------------
-        model = CustomModelEva(
+        model = CustomSwinModel(
                          args,
                          training=True
         ).to(args.device)
 
         if args.pretrain_dir:
-            model.load_state_dict(torch.load(os.path.join(args.pretrain_dir, f"model_best_fold{fold+1}.pt"), map_location=args.device))
+            model.load_state_dict(torch.load(os.path.join(args.pretrain_dir, f"model_best_fold{fold+1}.pt"), map_location=args.device), strict=False)
             print(f"Loaded pretrained model from {args.pretrain_dir}")
 
         # ------------------
