@@ -94,10 +94,11 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
         else:
             inputs, labels = batch[0].to(args.device), batch[1].squeeze().to(args.device)
         
-        if args.aux_loss_ratio:
+        if args.aux_loss_ratio and train:
             y_pred, aux_outs = model(inputs)
         else:
             y_pred = model(inputs)
+
         if (not args.do_mixup) & (isinstance(loss_func, torch.nn.BCEWithLogitsLoss) or isinstance(loss_func, torch.nn.BCELoss)):
             y_pred = y_pred.squeeze()
             labels = labels.float()  
@@ -108,7 +109,7 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
             loss = loss_func(y_pred, labels)  # 修正: loss_funcを使用
 
         # 補助損失の計算
-        if args.aux_loss_ratio:
+        if args.aux_loss_ratio and train:
             for i, (aux_out, aux_feature, aux_weight) in enumerate(zip(aux_outs, args.aux_loss_features, args.aux_loss_ratio)):
                 if args.aux_task_reg[i]:  # 回帰タスクの場合
                     aux_labels = aux_features[aux_feature].to(args.device).float()
