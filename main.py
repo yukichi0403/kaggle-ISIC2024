@@ -110,10 +110,11 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
         # 補助損失の計算
         if args.aux_loss_ratio:
             for i, (aux_out, aux_feature, aux_weight) in enumerate(zip(aux_outs, args.aux_loss_features, args.aux_loss_ratio)):
-                aux_labels = aux_features[aux_feature].to(args.device)
                 if args.aux_task_reg[i]:  # 回帰タスクの場合
-                    loss += nn.MSELoss()(aux_out, aux_labels) * aux_weight
+                    aux_labels = aux_features[aux_feature].to(args.device).float()
+                    loss += nn.MSELoss()(aux_out.squeeze(), aux_labels) * aux_weight
                 else:  # 分類タスクの場合
+                    aux_labels = aux_features[aux_feature].to(args.device).long()
                     loss += nn.CrossEntropyLoss()(aux_out, aux_labels.long()) * aux_weight
 
         # 予測値とラベルを保存
