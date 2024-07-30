@@ -89,7 +89,10 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
         else:
             inputs, labels = batch[0].to(args.device), batch[1].squeeze().to(args.device)
         
-        y_pred = model(inputs)
+        if args.aux_loss_ratio:
+            y_pred, aux_outs = model(inputs)
+        else:
+            y_pred = model(inputs)
         if (not args.do_mixup) & (isinstance(loss_func, torch.nn.BCEWithLogitsLoss) or isinstance(loss_func, torch.nn.BCELoss)):
             y_pred = y_pred.squeeze()
             labels = labels.float()  
@@ -98,7 +101,12 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
             loss = cross_entropy_loss(y_pred, mixed_labels)
         else:
             loss = loss_func(y_pred, labels)  # 修正: loss_funcを使用
-            
+
+        if args.aux_loss_ratio:
+            for aux_out, aux_feature, aux_weight in zip(aux_outs, args.aux_loss_features, args.aux_loss_feature_outnum):
+                aux_labels = batch[aux_feature].to(args.device).float()
+                loss += loss_func(aux_out, aux_labels) * aux_weight
+
         # 予測値とラベルを保存
         if isinstance(loss_func, nn.BCEWithLogitsLoss):
             all_preds.append(y_pred.sigmoid().cpu().detach().numpy())

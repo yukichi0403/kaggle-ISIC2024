@@ -66,6 +66,8 @@ class SkinCancerDataset(Dataset):
         else:
             self.fp_hdf = h5py.File(os.path.join(args.data_dir, "test-image.hdf5"), mode="r")
 
+        self.aux_loss_features = args.aux_loss_features
+
     def __len__(self) -> int:
         if self.split=="train" and self.sampling_rate is not None:
             return int(-(-len(self.df_positive) // self.sampling_rate))
@@ -107,10 +109,13 @@ class SkinCancerDataset(Dataset):
             X = self.__remove_hair(X)
         if self.augs:
             X = self.__random_transform(X, self.augs)
+        
+        aux_features = {aux_feature: df.iloc[i][aux_feature] for aux_feature in self.aux_loss_features}
+
         if self.split in ["train", "val"]:
-            return X, targets[i]
+            return X, targets[i], aux_features
         else:
-            return X
+            return X, aux_features
     
     def __remove_hair(self, img):
         return remove_hair(img, self.remove_hair_thresh)
