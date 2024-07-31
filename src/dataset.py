@@ -112,8 +112,10 @@ class SkinCancerDataset(Dataset):
         if self.aux_loss_features:
             aux_features = {aux_feature: df.iloc[i][aux_feature] for aux_feature in self.aux_loss_features}
 
-        if self.split in ["train", "val"]:
+        if self.split in ["train", "val"] and self.aux_loss_features:
             return X, targets[i], aux_features
+        elif self.split in ["train", "val"]:
+            return X, targets[i]
         else:
             return X, aux_features
     
