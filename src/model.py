@@ -31,7 +31,9 @@ class CustomModel(nn.Module):
                  training: bool = True, 
                  ):
         super(CustomModel, self).__init__()
-        self.aux_loss_ratio = args.aux_loss_ratio
+        self.aux_loss_features = args.aux_loss_features
+        self.aux_loss_feature_outnum = args.aux_loss_feature_outnum
+        
         self.training = training
         self.encoder = timm.create_model(args.model_name, pretrained=self.training,
                                           drop_path_rate=args.drop_path_rate)
