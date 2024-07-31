@@ -109,8 +109,8 @@ class SkinCancerDataset(Dataset):
             X = self.__remove_hair(X)
         if self.augs:
             X = self.__random_transform(X, self.augs)
-        
-        aux_features = {aux_feature: df.iloc[i][aux_feature] for aux_feature in self.aux_loss_features}
+        if self.aux_loss_features:
+            aux_features = {aux_feature: df.iloc[i][aux_feature] for aux_feature in self.aux_loss_features}
 
         if self.split in ["train", "val"]:
             return X, targets[i], aux_features
