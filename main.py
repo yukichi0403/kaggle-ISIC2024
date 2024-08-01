@@ -68,6 +68,17 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
         print("Training mode")
         model.train()
         current_lr = optimizer.param_groups[0]["lr"]
+        # エポックの最初にフリーズするパラメータを設定
+        if args.freezing_epochs:
+            if epoch < args.freezing_epochs:
+                print(f"Epoch {epoch+1}: Freezing non-head layers.")
+                for name, param in model.named_parameters():
+                    if "linear" not in name:
+                        param.requires_grad = False
+            else:
+                print(f"Epoch {epoch+1}: Unfreezing all layers.")
+                for param in model.parameters():
+                    param.requires_grad = True
     else: 
         print("Validation mode")
         model.eval()

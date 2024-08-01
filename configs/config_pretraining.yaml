@@ -13,6 +13,7 @@ expname: EffNet0b_Pretraining
 ver: 1
 sampling_rate: 0.5
 weighted_loss: True
+freezing_epochs: 
 
 model_name: tf_efficientnet_b0.ns_jft_in1k
 num_classes: 2

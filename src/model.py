@@ -84,7 +84,9 @@ class CustomModelEva(nn.Module):
                  training: bool = True, 
                  ):
         super(CustomModelEva, self).__init__()
-        self.aux_loss_ratio = args.aux_loss_ratio
+        self.aux_loss_features = args.aux_loss_features
+        self.aux_loss_feature_outnum = args.aux_loss_feature_outnum
+        
         self.training = training
         self.encoder = timm.create_model(args.model_name, pretrained=self.training,  # Always use pretrained weights
                                           drop_path_rate=args.drop_path_rate)
@@ -95,11 +97,9 @@ class CustomModelEva(nn.Module):
                               ])  # Dropout augmentation
         self.linear_main = nn.Linear(self.classifier_in_features, args.num_classes)
 
-        if args.aux_loss_ratio is not None:
-            self.dropout_aux = nn.ModuleList([
-                                    nn.Dropout(args.dropout) for _ in range(5)
-                                  ])  # Dropout augmentation
-            self.linear_aux = nn.Linear(self.classifier_in_features, 4)
+        if self.aux_loss_features is not None:
+            self.aux_dropout = nn.ModuleList([nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)]) for _ in self.aux_loss_features])
+            self.aux_linear = nn.ModuleList([nn.Linear(self.encoder.num_features, outnum) for outnum in self.aux_loss_feature_outnum])
 
     def forward(self, images):
         out = self.encoder(images)
@@ -108,15 +108,19 @@ class CustomModelEva(nn.Module):
             for i in range(len(self.dropout_main)):
                 main_out += self.linear_main(self.dropout_main[i](out))
             main_out = main_out / len(self.dropout_main)
-            if self.aux_loss_ratio is not None:
-                out_aux = 0
-                for i in range(len(self.dropout_aux)):
-                    out_aux += self.linear_aux(self.dropout_aux[i](out))
-                out_aux = out_aux / len(self.dropout_aux)
-                return main_out, out_aux
+
+            aux_outs = []
+            if self.aux_loss_features is not None:
+                for aux_dropout, aux_linear in zip(self.aux_dropout, self.aux_linear):
+                    out_aux = 0
+                    for i in range(len(aux_dropout)):
+                        out_aux += aux_linear(aux_dropout[i](out))
+                    out_aux = out_aux / len(aux_dropout)
+                    aux_outs.append(out_aux)
+                return main_out, aux_outs
         else:
             main_out = self.linear_main(out)
-        
+
         return main_out
 
 
