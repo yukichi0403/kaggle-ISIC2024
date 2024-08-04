@@ -311,7 +311,13 @@ def run(args: DictConfig):
             if np.mean(val_score) > max_val_score:
                 cprint("New best.", "cyan")
                 model_path = os.path.join(logdir, f"model_best_fold{fold+1}.pt")
-                torch.save(model.state_dict(), model_path)
+                # モデルの状態とその他の情報を保存
+                torch.save({
+                    'epoch': epoch,
+                    'model_state_dict': model.state_dict(),
+                    'val_score': val_score,
+                    'expname': args.expname,
+                }, model_path)
                 max_val_score = np.mean(val_score)
                 no_improve_epochs = 0
             else:
