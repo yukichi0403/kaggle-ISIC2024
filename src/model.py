@@ -222,3 +222,56 @@ class CustomSwinModel(nn.Module):
             main_out = self.linear_main(out)
 
         return main_out
+    
+
+
+#######################
+#### ResNet
+####################### 
+class CustomModelResNet(nn.Module):
+    def __init__(self, 
+                 args,
+                 training: bool = True, 
+                 ):
+        super(CustomModelResNet, self).__init__()
+        self.aux_loss_features = args.aux_loss_features
+        self.aux_loss_feature_outnum = args.aux_loss_feature_outnum
+        
+        self.training = training
+        self.encoder = timm.create_model(args.model_name, pretrained=self.training,
+                                          drop_path_rate=args.drop_path_rate)
+        self.features = nn.Sequential(*list(self.encoder.children())[:-2])
+
+        self.classifier_in_features = self.encoder.fc.in_features
+        self.GeM = GeM(p=args.gem_p)
+        self.dropout_main = nn.ModuleList([
+          nn.Dropout(args.dropout) for _ in range(5)
+        ]) #droupout augmentation
+        self.linear_main = nn.Linear(self.classifier_in_features, args.num_classes)
+
+        if self.aux_loss_features is not None:
+            self.aux_dropout = nn.ModuleList([nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)]) for _ in self.aux_loss_features])
+            self.aux_linear = nn.ModuleList([nn.Linear(self.encoder.num_features, outnum) for outnum in self.aux_loss_feature_outnum])
+
+    def forward(self, images):
+        out = self.features(images)
+        out = self.GeM(out).flatten(1)
+        if self.training:
+            main_out = 0
+            for i in range(len(self.dropout_main)):
+                main_out += self.linear_main(self.dropout_main[i](out))
+            main_out = main_out / len(self.dropout_main)
+
+            aux_outs = []
+            if self.aux_loss_features is not None:
+                for aux_dropout, aux_linear in zip(self.aux_dropout, self.aux_linear):
+                    out_aux = 0
+                    for i in range(len(aux_dropout)):
+                        out_aux += aux_linear(aux_dropout[i](out))
+                    out_aux = out_aux / len(aux_dropout)
+                    aux_outs.append(out_aux)
+                return main_out, aux_outs
+        else:
+            main_out = self.linear_main(out)
+
+        return main_out
