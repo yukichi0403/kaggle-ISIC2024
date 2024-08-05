@@ -60,6 +60,30 @@ def get_dataset_and_loader(loader_args, train_df, val_df, train_transforms, val_
     return train_loader, val_loader
 
 
+def load_model(args, fold):
+    # モデルのインスタンスを作成
+    model = CustomSwinModel(args, training=False).to(args.device)
+    
+    # モデルの重みまたは辞書形式で保存されたファイルをロード
+    file_path = os.path.join(args.pretrain_dir, f"model_best_fold{fold+1}.pt")
+    checkpoint = torch.load(file_path, map_location=torch.device(args.device))
+    
+    # 保存ファイルが辞書形式か単なる重みファイルかを確認
+    if isinstance(checkpoint, dict):
+        # 辞書形式の場合、状態を取り出してモデルにロード
+        model.load_state_dict(checkpoint['model_state_dict'])
+        # 必要ならメタデータを取得
+        epoch = checkpoint.get('epoch', None)
+        val_score = checkpoint.get('val_score', None)
+        print(f"Loaded model from fold {fold+1}, epoch: {epoch}, val_score: {val_score}")
+    else:
+        # 単なる重みファイルの場合
+        model.load_state_dict(checkpoint)
+
+    model.to(args.device)
+    return model
+
+
 def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func):
     losses, all_labels, all_preds = [], [], []
 
@@ -252,8 +276,7 @@ def run(args: DictConfig):
         ).to(args.device)
 
         if args.pretrain_dir:
-            model.load_state_dict(torch.load(os.path.join(args.pretrain_dir, f"model_best_fold{fold+1}.pt"), map_location=args.device), strict=False)
-            print(f"Loaded pretrained model from {args.pretrain_dir}")
+            model = load_model(args, fold)
 
         # ------------------
         #     Optimizer
