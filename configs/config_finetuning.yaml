@@ -42,3 +42,5 @@ aux_loss_features:
 aux_loss_ratio:
 aux_task_reg:
 aux_loss_feature_outnum:
+
+pseudo_label: False
