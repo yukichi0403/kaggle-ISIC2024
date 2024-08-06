@@ -62,7 +62,7 @@ def get_dataset_and_loader(loader_args, train_df, val_df, train_transforms, val_
 
 def load_model(args, fold):
     # モデルのインスタンスを作成
-    model = CustomSwinModel(args, training=False).to(args.device)
+    model = CustomModelEva(args, training=False).to(args.device)
     
     # モデルの重みまたは辞書形式で保存されたファイルをロード
     file_path = os.path.join(args.pretrain_dir, f"model_best_fold{fold+1}.pt")
@@ -267,13 +267,6 @@ def run(args: DictConfig):
         # ------------------
         train_loader, val_loader = get_dataset_and_loader(loader_args, train_df, valid_df, train_transform, val_transforms, args)
 
-        # ------------------
-        #       Model
-        # ------------------
-        model = CustomModel(
-                         args,
-                         training=True
-        ).to(args.device)
 
         if args.pretrain_dir:
             model = load_model(args, fold)
