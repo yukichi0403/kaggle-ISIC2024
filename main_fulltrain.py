@@ -191,7 +191,7 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
 
 
 
-@hydra.main(version_base=None, config_path="configs", config_name="config_finetuning")
+@hydra.main(version_base=None, config_path="configs", config_name="config_fulltraining")
 def run(args: DictConfig): 
     print(args)
     set_seed(args.seed)
@@ -320,15 +320,16 @@ def run(args: DictConfig):
             wandb.log({"train_loss": np.mean(train_loss), "train_score": np.mean(train_score), "train_auc": np.mean(train_auc), 
                         "lr": current_lr})
 
-
-    model_path = os.path.join(logdir, f"model_best_fold{1}.pt")
-    # モデルの状態とその他の情報を保存
-    torch.save({
-        'epoch': epoch,
-        'model_state_dict': model.state_dict(),
-        'train_score': train_score,
-        'expname': args.expname,
-    }, model_path)
+    if train_score > args.target_score:
+        cprint("EarlyStopping.", "cyan")
+        model_path = os.path.join(logdir, f"model_best_fold{1}.pt")
+        # モデルの状態とその他の情報を保存
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'train_score': train_score,
+            'expname': args.expname,
+        }, model_path)
 
 
     if args.local_dir:

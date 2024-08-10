@@ -1,0 +1,46 @@
+data_dir: /content/drive/MyDrive/24_7_ISIC2024/Input/isic-2024-challenge
+data_dir_archive: /content/drive/MyDrive/24_7_ISIC2024/Input/all-isic-data-gkf-256
+image_dir: 
+archive_image_dir: /content/drive/MyDrive/24_7_ISIC2024/Input/all-isic-data-20240629/train-image/image
+train_df_dir: /content/drive/MyDrive/24_7_ISIC2024/Input/isic-2024-challenge/train-metadata-gkffold.csv
+local_dir: /content/drive/MyDrive/24_7_ISIC2024/Output
+use_JPEG: True
+
+pretrain_dir: 
+COLAB: False
+test: True
+expname: EffNet0b_GKF
+ver: 
+sampling_rate: 0.5
+weighted_loss: True
+freezing_epochs: 
+
+model_name: tf_efficientnet_b0.ns_jft_in1k
+num_classes: 2
+gem_p: 3
+drop_path_rate: 0.1
+dropout: 0.1
+
+batch_size: 64
+epochs: 10
+lr: 1e-4
+weight_decay: 1e-6
+scheduler: cosine
+early_stopping_rounds: 3
+num_splits: 5
+do_mixup: True
+
+device: cuda:0
+num_workers: 4
+seed: 42
+use_wandb: False
+
+img_size: 256
+remove_hair_thresh: 10
+
+aux_loss_features:
+aux_loss_ratio:
+aux_task_reg:
+aux_loss_feature_outnum:
+
+pseudo_label: False
