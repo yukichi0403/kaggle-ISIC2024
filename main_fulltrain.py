@@ -321,30 +321,32 @@ def run(args: DictConfig):
                         "lr": current_lr})
 
         if train_score > args.target_score:
-            cprint("EarlyStopping.", "cyan")
-            model_path = os.path.join(logdir, f"model_best_fold1.pt")
-            # モデルの状態とその他の情報を保存
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': model.state_dict(),
-                'train_score': train_score,
-                'expname': args.expname,
-            }, model_path)
-            break
+          if args.use_wandb:
+              wandb.finish()
+          cprint("early stopping", "cyan")
+          return 
+          
+        model_path = os.path.join(logdir, f"model_fulltrain_score{train_score}.pt")
+        # モデルの状態とその他の情報を保存
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'train_score': train_score,
+            'expname': args.expname,
+        }, model_path)
 
 
-    if args.local_dir:
-        # Localにコピー
-        local_dir = os.path.join(args.local_dir, f"{args.expname}_{args.ver}")
-        os.makedirs(local_dir, exist_ok=True)
+        if args.local_dir:
+            # Localにコピー
+            local_dir = os.path.join(args.local_dir, f"{args.expname}_{args.ver}")
+            os.makedirs(local_dir, exist_ok=True)
 
-        model_path = os.path.join(logdir, f"model_best_fold{1}.pt")
-        if os.path.exists(model_path):
-            shutil.copy(model_path, local_dir)
-            print(f'Model saved to Local: {local_dir}')
+            model_path = os.path.join(logdir, f"model_fulltrain_score{train_score}.pt")
+            if os.path.exists(model_path):
+                shutil.copy(model_path, local_dir)
+                print(f'Model saved to Local: {local_dir}')
     
-    if args.use_wandb:
-        wandb.finish()
+    
 
 
 if __name__ == "__main__":
