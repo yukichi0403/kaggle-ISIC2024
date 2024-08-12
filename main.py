@@ -110,40 +110,32 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
     
     mode = "Train" if train else "Validation"
     for batch in tqdm(loader, desc=mode):
-
-        if args.aux_loss_features is not None:
-            inputs, labels, aux_features = batch[0].to(args.device), batch[1].squeeze().to(args.device), batch[2]
-
-        elif train and args.do_mixup:
-            lam = np.random.beta(a=args.do_mixup, b=1)
-
-            inputs, labels = batch[0][0], batch[0][1]
-            balanced_inputs, balanced_labels = batch[1][0], batch[1][1]
-
-            inputs, labels = inputs.to(args.device), labels.squeeze().to(args.device)
-            balanced_inputs, balanced_labels = balanced_inputs.to(args.device), balanced_labels.squeeze().to(args.device)
-
-            inputs = (1 - lam) * inputs + lam * balanced_inputs
-            mixed_labels = (1 - lam) * F.one_hot(labels, args.num_classes) + lam * F.one_hot(balanced_labels, args.num_classes)
-
-            del balanced_inputs
-            del balanced_labels
+        if args.use_metadata:
+            if args.aux_features is not None:
+                inputs, labels, aux_features, metadata = batch[0].to(args.device), batch[1].squeeze().to(args.device), batch[2], batch[3]
+            else:
+                inputs, labels, metadata = batch[0].to(args.device), batch[1].squeeze().to(args.device), batch[2]
         else:
-            inputs, labels = batch[0].to(args.device), batch[1].squeeze().to(args.device)
-        
-        if args.aux_loss_ratio and train:
+            if args.aux_features is not None:
+                inputs, labels, aux_features = batch[0].to(args.device), batch[1].squeeze().to(args.device), batch[2]
+            else:
+                inputs, labels = batch[0].to(args.device), batch[1].squeeze().to(args.device)
+
+
+        if args.use_metadata:
+            y_pred = model(inputs, metadata)
+        elif args.use_metadata and args.aux_features is not None:
+            y_pred, aux_outs = model(inputs, metadata)
+        elif args.aux_features is not None:
             y_pred, aux_outs = model(inputs)
         else:
             y_pred = model(inputs)
 
-        if (not args.do_mixup) & (isinstance(loss_func, torch.nn.BCEWithLogitsLoss) or isinstance(loss_func, torch.nn.BCELoss)):
+        if (isinstance(loss_func, torch.nn.BCEWithLogitsLoss) or isinstance(loss_func, torch.nn.BCELoss)):
             y_pred = y_pred.squeeze()
             labels = labels.float()  
             
-        if train and args.do_mixup:
-            loss = cross_entropy_loss(y_pred, mixed_labels)
-        else:
-            loss = loss_func(y_pred, labels)  # 修正: loss_funcを使用
+        loss = loss_func(y_pred, labels)  # 修正: loss_funcを使用
 
         # 補助損失の計算
         if args.aux_loss_ratio and train:
@@ -268,7 +260,6 @@ def run(args: DictConfig):
         # ------------------
         train_loader, val_loader = get_dataset_and_loader(loader_args, train_df, valid_df, train_transform, val_transforms, args)
 
-
         model = load_model(args, fold)
 
 
@@ -288,37 +279,14 @@ def run(args: DictConfig):
         for epoch in range(args.epochs):
             print(f"Epoch {epoch+1}/{args.epochs}")
 
-            train_loss, train_acc, val_loss, val_acc = [], [], [], []
+            train_loss, val_loss = [], []
             current_lr = optimizer.param_groups[0]["lr"]
-            if not args.do_mixup:
-                if args.weighted_loss:
-                    if args.weighted_loss:
-                        # pos_weight は target==1 のサンプルの比率で重み付けします
-                        pos_weight = torch.tensor([(1.0 - args.sampling_rate) / args.sampling_rate]).to(args.device)
-                    else:
-                        pos_weight = torch.tensor([(1.0 - target_ratio) / target_ratio]).to(args.device)
-                    print(f"Using weighted loss. pos_weight: {pos_weight}")
-                    loss_func = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-                else:
-                    loss_func = torch.nn.BCEWithLogitsLoss()
-            else:
-                loss_func = torch.nn.CrossEntropyLoss()
-            
-            if args.do_mixup:   
-                #train mixup dataset
-                combo_loader = get_combo_loader(train_loader, base_sampling="instance")
-                #mixupの場合は、train_loader=combo_loader
-                _, _ , _ = run_one_epoch(combo_loader, model, optimizer, lr_scheduler, args, epoch, loss_func)
-            else:
-                train_loss, train_score, train_auc = run_one_epoch(train_loader, model, optimizer, lr_scheduler, args, epoch, loss_func)
+
+            loss_func = torch.nn.BCEWithLogitsLoss()
+            train_loss, train_score, train_auc = run_one_epoch(train_loader, model, optimizer, lr_scheduler, args, epoch, loss_func)
 
             with torch.no_grad():
-                if args.do_mixup:
-                    #ここで実際のTrainDataに対するロスを計算
-                    train_loss, train_score, train_auc = run_one_epoch(train_loader, model, None, None, args, epoch, loss_func)
-                    val_loss, val_score, val_auc = run_one_epoch(val_loader, model, None, None, args, epoch, loss_func)
-                else:
-                    val_loss, val_score, val_auc = run_one_epoch(val_loader, model,  None, None, args, epoch, loss_func)
+                val_loss, val_score, val_auc = run_one_epoch(val_loader, model,  None, None, args, epoch, loss_func)
                 
             if args.use_wandb:
                 wandb.log({"train_loss": np.mean(train_loss), "train_score": np.mean(train_score), "train_auc": np.mean(train_auc), 

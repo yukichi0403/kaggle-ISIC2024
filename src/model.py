@@ -49,6 +49,19 @@ class CustomModel(nn.Module):
             self.aux_dropout = nn.ModuleList([nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)]) for _ in self.aux_loss_features])
             self.aux_linear = nn.ModuleList([nn.Linear(self.encoder.num_features, outnum) for outnum in self.aux_loss_feature_outnum])
 
+        if args.use_metadata:
+            self.block_1 = nn.Sequential(
+                nn.Linear(args.use_metadata_num, self.classifier_in_features * 4),
+                nn.BatchNorm1d(self.classifier_in_features * 4),
+                nn.Swish(),
+                nn.Dropout(args.dropout),
+            )
+            self.block_2 = nn.Sequential(
+                nn.Linear(self.classifier_in_features * 4, self.classifier_in_features),
+                nn.BatchNorm1d(self.classifier_in_features),
+                nn.Swish(),
+            )
+
     def forward(self, images):
         out = self.features(images)
         out = self.GeM(out).flatten(1)

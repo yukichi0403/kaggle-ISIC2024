@@ -28,7 +28,6 @@ weight_decay: 1e-6
 scheduler: cosine
 early_stopping_rounds: 3
 num_splits: 5
-do_mixup: True
 
 device: cuda:0
 num_workers: 4
@@ -42,5 +41,6 @@ aux_loss_features:
 aux_loss_ratio:
 aux_task_reg:
 aux_loss_feature_outnum:
+use_metadata_num: 0
 
 pseudo_label: False
