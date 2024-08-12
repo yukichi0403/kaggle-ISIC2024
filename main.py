@@ -69,17 +69,17 @@ def load_model(args, fold):
         file_path = os.path.join(args.pretrain_dir, f"model_best_fold{fold+1}.pt")
         checkpoint = torch.load(file_path, map_location=torch.device(args.device))
         
-        # 保存ファイルが辞書形式か単なる重みファイルかを確認
-        if isinstance(checkpoint, dict):
-            # 辞書形式の場合、状態を取り出してモデルにロード
-            model.load_state_dict(checkpoint['model_state_dict'])
-            # 必要ならメタデータを取得
-            epoch = checkpoint.get('epoch', None)
-            val_score = checkpoint.get('val_score', None)
-            print(f"Loaded model from fold {fold+1}, epoch: {epoch}, val_score: {val_score}")
-        else:
-            # 単なる重みファイルの場合
-            model.load_state_dict(checkpoint)
+        # # 保存ファイルが辞書形式か単なる重みファイルかを確認
+        # if isinstance(checkpoint, dict):
+        #     # 辞書形式の場合、状態を取り出してモデルにロード
+        #     model.load_state_dict(checkpoint['model_state_dict'])
+        #     # 必要ならメタデータを取得
+        #     epoch = checkpoint.get('epoch', None)
+        #     val_score = checkpoint.get('val_score', None)
+        #     print(f"Loaded model from fold {fold+1}, epoch: {epoch}, val_score: {val_score}")
+        # else:
+        # 単なる重みファイルの場合
+        model.load_state_dict(checkpoint, strict=False)
 
     model.to(args.device)
     return model
@@ -110,23 +110,23 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
     
     mode = "Train" if train else "Validation"
     for batch in tqdm(loader, desc=mode):
-        if args.use_metadata:
-            if args.aux_features is not None:
-                inputs, labels, aux_features, metadata = batch[0].to(args.device), batch[1].squeeze().to(args.device), batch[2], batch[3]
+        if args.use_metadata_num:
+            if args.aux_loss_features is not None:
+                inputs, labels, aux_features, metadata = batch[0].to(args.device), batch[1].squeeze().to(args.device), batch[2].to(args.device), batch[3].to(args.device)
             else:
-                inputs, labels, metadata = batch[0].to(args.device), batch[1].squeeze().to(args.device), batch[2]
+                inputs, labels, metadata = batch[0].to(args.device), batch[1].squeeze().to(args.device), batch[2].to(args.device)
         else:
-            if args.aux_features is not None:
-                inputs, labels, aux_features = batch[0].to(args.device), batch[1].squeeze().to(args.device), batch[2]
+            if args.aux_loss_features is not None:
+                inputs, labels, aux_features = batch[0].to(args.device), batch[1].squeeze().to(args.device), batch[2].to(args.device)
             else:
                 inputs, labels = batch[0].to(args.device), batch[1].squeeze().to(args.device)
 
 
-        if args.use_metadata:
+        if args.use_metadata_num:
             y_pred = model(inputs, metadata)
-        elif args.use_metadata and args.aux_features is not None:
+        elif args.use_metadata_num and args.aux_loss_features is not None:
             y_pred, aux_outs = model(inputs, metadata)
-        elif args.aux_features is not None:
+        elif args.aux_loss_features is not None:
             y_pred, aux_outs = model(inputs)
         else:
             y_pred = model(inputs)
@@ -189,7 +189,7 @@ def run(args: DictConfig):
     
     train = pd.read_csv(args.train_df_dir)
     train ,_ ,_ = feature_engineering(train)
-    meta_cols = ['isic_id', 'target', 'fold', 'clin_size_long_diam_mm', 'tbp_lv_A', 'tbp_lv_Aext','tbp_lv_B', 'tbp_lv_Bext', 'tbp_lv_C', 'tbp_lv_Cext', 'tbp_lv_H',
+    meta_cols = ['isic_id', 'target', 'fold', 'archive', 'clin_size_long_diam_mm', 'tbp_lv_A', 'tbp_lv_Aext','tbp_lv_B', 'tbp_lv_Bext', 'tbp_lv_C', 'tbp_lv_Cext', 'tbp_lv_H',
                  'tbp_lv_Hext', 'tbp_lv_L', 'tbp_lv_Lext', 'tbp_lv_areaMM2','tbp_lv_area_perim_ratio', 'tbp_lv_color_std_mean', 'tbp_lv_deltaA',
                  'tbp_lv_deltaB', 'tbp_lv_deltaL', 'tbp_lv_deltaLB', 'tbp_lv_deltaLBnorm', 'tbp_lv_eccentricity', 'tbp_lv_minorAxisMM',
                  'tbp_lv_nevi_confidence', 'tbp_lv_norm_border', 'tbp_lv_norm_color', 'tbp_lv_perimeterMM', 'tbp_lv_radial_color_std_max', 

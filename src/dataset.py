@@ -11,6 +11,7 @@ from io import BytesIO
 import pandas as pd
 import cv2
 import random
+from sklearn.preprocessing import StandardScaler
 
 
 def remove_hair(image, threshold):
@@ -44,6 +45,11 @@ class SkinCancerDataset(Dataset):
         self.sampling_rate = args.sampling_rate
         self.use_JPEG = args.use_JPEG
         self.use_metadata_num = args.use_metadata_num
+
+        if self.use_metadata_num:
+            self.metadata_scaler = StandardScaler()
+            self.metadata = self.metadata_scaler.fit_transform(df.iloc[:, 4:4+self.use_metadata_num].values.astype(np.float32))
+
         if split=="train" and self.sampling_rate is not None:
             print("Now sampling mode")
             self.df_positive = df[df["target"] == 1].reset_index()
@@ -117,12 +123,12 @@ class SkinCancerDataset(Dataset):
             if self.aux_loss_features:
                 if self.use_metadata_num:
                     # isic_id, target, fold, metadataの順番なので3:にする
-                    return X, targets[i], aux_features, df.iloc[i, 3:3+self.use_metadata_num].values
+                    return X, targets[i], aux_features, self.metadata[i]
                 else:
                     return X, targets[i], aux_features
             else:
                 if self.use_metadata_num:
-                    return X, targets[i], df.iloc[i, 3:3+self.use_metadata_num].values
+                    return X, targets[i], self.metadata[i]
                 else:
                     return X, targets[i]
         else:
