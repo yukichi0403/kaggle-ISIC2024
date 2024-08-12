@@ -43,7 +43,7 @@ class SkinCancerDataset(Dataset):
         self.df = df
         self.sampling_rate = args.sampling_rate
         self.use_JPEG = args.use_JPEG
-        self.use_metadata = args.use_metadata
+        self.use_metadata_num = args.use_metadata_num
         if split=="train" and self.sampling_rate is not None:
             print("Now sampling mode")
             self.df_positive = df[df["target"] == 1].reset_index()
@@ -115,14 +115,14 @@ class SkinCancerDataset(Dataset):
 
         if self.split in ["train", "val"]:
             if self.aux_loss_features:
-                if self.use_metadata:
+                if self.use_metadata_num:
                     # isic_id, target, fold, metadataの順番なので3:にする
-                    return X, targets[i], aux_features, df.iloc[i, 3:].values
+                    return X, targets[i], aux_features, df.iloc[i, 3:3+self.use_metadata_num].values
                 else:
                     return X, targets[i], aux_features
             else:
-                if self.use_metadata:
-                    return X, targets[i], df.iloc[i, 3:].values
+                if self.use_metadata_num:
+                    return X, targets[i], df.iloc[i, 3:3+self.use_metadata_num].values
                 else:
                     return X, targets[i]
         else:
