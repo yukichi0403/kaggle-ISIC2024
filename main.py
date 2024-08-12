@@ -23,7 +23,6 @@ from src.model import *
 from src.feature_engeneering import *
 
 import torch.nn as nn
-import cprint
 
 # Classのサンプル数のバランスを取るための関数
 def sampling(train, ratio=1):
