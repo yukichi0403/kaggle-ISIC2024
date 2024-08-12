@@ -23,6 +23,7 @@ from src.model import *
 from src.feature_engeneering import *
 
 import torch.nn as nn
+import cprint
 
 # Classのサンプル数のバランスを取るための関数
 def sampling(train, ratio=1):
@@ -37,7 +38,6 @@ def sampling(train, ratio=1):
     balanced_df = balanced_df.sample(frac=1, random_state=42).reset_index(drop=True)
     
     return balanced_df
-
 
 
 def cross_entropy_loss(input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
@@ -69,17 +69,28 @@ def load_model(args, fold):
         file_path = os.path.join(args.pretrain_dir, f"model_best_fold{fold+1}.pt")
         checkpoint = torch.load(file_path, map_location=torch.device(args.device))
         
-        # # 保存ファイルが辞書形式か単なる重みファイルかを確認
-        # if isinstance(checkpoint, dict):
-        #     # 辞書形式の場合、状態を取り出してモデルにロード
-        #     model.load_state_dict(checkpoint['model_state_dict'])
-        #     # 必要ならメタデータを取得
-        #     epoch = checkpoint.get('epoch', None)
-        #     val_score = checkpoint.get('val_score', None)
-        #     print(f"Loaded model from fold {fold+1}, epoch: {epoch}, val_score: {val_score}")
-        # else:
-        # 単なる重みファイルの場合
-        model.load_state_dict(checkpoint, strict=False)
+        # バックボーンの重みのみをフィルタリングする関数
+        def filter_backbone(state_dict):
+            return {k: v for k, v in state_dict.items() if not k.startswith('block_1') and not k.startswith('block_2') and not k.startswith('linear_main')}
+
+        # 保存ファイルが辞書形式か単なる重みファイルかを確認
+        if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+            # 辞書形式の場合
+            state_dict = checkpoint['model_state_dict']
+            if args.use_metadata_num:
+                state_dict = filter_backbone(state_dict)
+            # フィルタリングされた状態をモデルにロード
+            model.load_state_dict(state_dict, strict=False)
+            # メタデータを取得
+            epoch = checkpoint.get('epoch', None)
+            val_score = checkpoint.get('val_score', None)
+            cprint(f"Loaded {'backbone' if args.use_metadata_num else 'full model'} from fold {fold+1}, epoch: {epoch}, val_score: {val_score}", "cyan")
+        else:
+            # 単なる重みファイルの場合
+            if args.use_metadata_num:
+                checkpoint = filter_backbone(checkpoint)
+            model.load_state_dict(checkpoint, strict=False)
+            print(f"Loaded {'backbone' if args.use_metadata_num else 'full model'} from fold {fold+1}")
 
     model.to(args.device)
     return model
@@ -181,6 +192,24 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
     return np.mean(losses), score, auc_score
 
 
+def configure_optimizers(model, args):
+    if args.use_metadata_num:
+        # メタデータブロックのパラメータを取得
+        metadata_params = list(model.block_1.parameters()) + list(model.block_2.parameters())
+        cprint(f"Set metadata backbone lr: {args.lr * 0.1}", "cyan")
+    else:
+        metadata_params = []
+    
+    # その他のパラメータを取得
+    other_params = [p for n, p in model.named_parameters() if not any(p is mp for mp in metadata_params)]
+    
+    # オプティマイザーを設定
+    optimizer = torch.optim.AdamW([
+        {'params': other_params},
+        {'params': metadata_params, 'lr': args.lr * 0.1}  # メタデータブロックの学習率を10分の1に設定
+    ], lr=args.lr, weight_decay=args.weight_decay)
+    
+    return optimizer
 
 @hydra.main(version_base=None, config_path="configs", config_name="config_finetuning")
 def run(args: DictConfig): 
@@ -194,7 +223,7 @@ def run(args: DictConfig):
                  'tbp_lv_deltaB', 'tbp_lv_deltaL', 'tbp_lv_deltaLB', 'tbp_lv_deltaLBnorm', 'tbp_lv_eccentricity', 'tbp_lv_minorAxisMM',
                  'tbp_lv_nevi_confidence', 'tbp_lv_norm_border', 'tbp_lv_norm_color', 'tbp_lv_perimeterMM', 'tbp_lv_radial_color_std_max', 
                  'tbp_lv_stdL', 'tbp_lv_stdLExt', 'tbp_lv_symm_2axis', 'tbp_lv_symm_2axis_angle',
-                 'tbp_lv_x', 'tbp_lv_y', 'tbp_lv_z', 'tbp_lv_dnn_lesion_confidence',]
+                 'tbp_lv_x', 'tbp_lv_y', 'tbp_lv_z', ]
     train = train[meta_cols]
     
     logdir = "/kaggle/working/" if not args.COLAB else hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
@@ -272,7 +301,7 @@ def run(args: DictConfig):
         # ------------------
         #     Optimizer
         # ------------------
-        optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        optimizer = configure_optimizers(model, args)
         lr_scheduler = get_scheduler(args, optimizer, len(train_loader))
     
     
