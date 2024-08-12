@@ -37,7 +37,8 @@ use_wandb: False
 
 img_size: 256
 remove_hair_thresh: 10
-target_score: 0.163
+
+target_score: 0.175
 
 aux_loss_features:
 aux_loss_ratio:

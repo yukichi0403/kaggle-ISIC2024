@@ -43,7 +43,7 @@ class CustomModel(nn.Module):
         self.dropout_main = nn.ModuleList([
 			nn.Dropout(args.dropout) for _ in range(5)
 		]) #droupout augmentation
-        self.linear_main = nn.Linear(self.classifier_in_features, args.num_classes)
+        self.linear_main = nn.Linear(self.classifier_in_features * 2, args.num_classes)
 
         if self.aux_loss_features is not None:
             self.aux_dropout = nn.ModuleList([nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)]) for _ in self.aux_loss_features])
@@ -62,9 +62,12 @@ class CustomModel(nn.Module):
                 nn.Swish(),
             )
 
-    def forward(self, images):
+    def forward(self, images, metadata):
         out = self.features(images)
+        meta_out = self.block_1(metadata)
+        meta_out = self.block_2(meta_out)
         out = self.GeM(out).flatten(1)
+        out = torch.cat([out, meta_out], dim=1)
         if self.training:
             main_out = 0
             for i in range(len(self.dropout_main)):
