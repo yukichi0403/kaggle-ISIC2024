@@ -116,12 +116,13 @@ class SkinCancerDataset(Dataset):
         if self.split in ["train", "val"]:
             if self.aux_loss_features:
                 if self.use_metadata:
-                    return X, targets[i], aux_features, df.iloc[i, 1:].values
+                    # isic_id, target, fold, metadataの順番なので3:にする
+                    return X, targets[i], aux_features, df.iloc[i, 3:].values
                 else:
                     return X, targets[i], aux_features
             else:
                 if self.use_metadata:
-                    return X, targets[i], df.iloc[i, 1:].values
+                    return X, targets[i], df.iloc[i, 3:].values
                 else:
                     return X, targets[i]
         else:
