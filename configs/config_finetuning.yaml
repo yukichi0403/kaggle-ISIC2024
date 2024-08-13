@@ -42,5 +42,6 @@ aux_loss_ratio:
 aux_task_reg:
 aux_loss_feature_outnum:
 use_metadata_num: 0
+metadata_head_weight: 0.1
 
 pseudo_label: False

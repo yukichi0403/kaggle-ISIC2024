@@ -205,17 +205,17 @@ def configure_optimizers(model, args):
     if args.use_metadata_num:
         # メタデータブロックのパラメータを取得
         metadata_params = list(model.block_1.parameters()) + list(model.block_2.parameters())
-        cprint(f"Set metadata backbone lr: {args.lr * 0.1}", "cyan")
+        cprint(f"Set metadata backbone lr: {args.lr * args.metadata_head_weight}", "cyan")
     else:
         metadata_params = []
     
     # その他のパラメータを取得
-    other_params = [p for n, p in model.named_parameters() if not any(p is mp for mp in metadata_params)]
+    other_params = [p for _, p in model.named_parameters() if not any(p is mp for mp in metadata_params)]
     
     # オプティマイザーを設定
     optimizer = torch.optim.AdamW([
         {'params': other_params},
-        {'params': metadata_params, 'lr': args.lr * 0.1}  # メタデータブロックの学習率を10分の1に設定
+        {'params': metadata_params, 'lr': args.lr * args.metadata_head_weight}  # メタデータブロックの学習率を10分の1に設定
     ], lr=args.lr, weight_decay=args.weight_decay)
     
     return optimizer
