@@ -60,8 +60,18 @@ def get_dataset_and_loader(loader_args, train_df, val_df, train_transforms, val_
 
 
 def load_model(args, fold):
-    # モデルのインスタンスを作成
-    model = CustomModel(args, training=True).to(args.device)
+    if "efficientnet" in args.model_name:
+        model = CustomModel(args, training=True).to(args.device)
+    elif "swin" in args.model_name:
+        model = CustomSwinModel(args, training=True).to(args.device)
+    elif "convnext" in args.model_name:
+        model = CustomConvNextModel(args, training=True).to(args.device)
+    elif "eva" in args.model_name:
+        model = CustomModelEva(args, training=True).to(args.device)
+    elif "resnext" in args.model_name:
+        model = CustomModelResNet(args, training=True).to(args.device)
+    else:
+        raise ValueError(f"Model {args.model_name} not supported")
 
     if args.pretrain_dir:
         # モデルの重みまたは辞書形式で保存されたファイルをロード
