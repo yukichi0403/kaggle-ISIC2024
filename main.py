@@ -286,7 +286,7 @@ def run(args: DictConfig):
                         ToTensorV2()])
         
     for fold in range(args.num_splits):
-        if args.test and fold > 0:
+        if fold not in args.use_fold:
             print(f"Test mode. Skipping fold{fold+1}")
             continue
         

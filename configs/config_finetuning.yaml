@@ -5,10 +5,10 @@ archive_image_dir: /content/drive/MyDrive/24_7_ISIC2024/Input/all-isic-data-2024
 train_df_dir: /content/drive/MyDrive/24_7_ISIC2024/Input/isic-2024-challenge/train-metadata-gkffold.csv
 local_dir: /content/drive/MyDrive/24_7_ISIC2024/Output
 use_JPEG: True
+use_fold: [0, 1, 2, 3, 4]
 
 pretrain_dir: 
 COLAB: False
-test: True
 expname: EffNet0b_GKF
 ver: 
 sampling_rate: 0.5
@@ -42,6 +42,6 @@ aux_loss_ratio:
 aux_task_reg:
 aux_loss_feature_outnum:
 use_metadata_num: 0
-metadata_head_weight: 0.1
+metadata_head_weight: 
 
 pseudo_label: False
