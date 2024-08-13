@@ -216,14 +216,12 @@ class CustomSwinModel(nn.Module):
         self.features = nn.Sequential(*list(self.encoder.children())[:-1])
         self.GAP = SelectAdaptivePool2d(pool_type='avg', input_fmt='NHWC', flatten=True)
         self.dropout_main = nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)])  # Dropout augmentation
-        self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
         
         self.use_metadata = args.use_metadata_num is not None and args.use_metadata_num > 0
-        
         if self.use_metadata:
-            self.linear_main = nn.Linear(self.classifier_in_features * 2, args.num_classes)
+            self.linear_main = nn.Linear(self.encoder.num_features * 2, args.num_classes)
         else:
-            self.linear_main = nn.Linear(self.classifier_in_features, args.num_classes)
+            self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
 
         if self.aux_loss_features is not None:
             self.aux_dropout = nn.ModuleList([nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)]) for _ in self.aux_loss_features])
