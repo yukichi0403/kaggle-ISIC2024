@@ -48,7 +48,10 @@ class SkinCancerDataset(Dataset):
 
         if self.use_metadata_num:
             self.metadata_scaler = StandardScaler()
-            self.metadata = self.metadata_scaler.fit_transform(df.iloc[:, 4:4+self.use_metadata_num].values.astype(np.float32))
+            if split != "test":
+                self.metadata = self.metadata_scaler.fit_transform(df.iloc[:, 4:4+self.use_metadata_num].values.astype(np.float32))
+            else:
+                self.metadata = self.metadata_scaler.fit_transform(df.iloc[:, 1:1+self.use_metadata_num].values.astype(np.float32))
 
         if split=="train" and self.sampling_rate is not None:
             print("Now sampling mode")
@@ -132,8 +135,8 @@ class SkinCancerDataset(Dataset):
                 else:
                     return X, targets[i]
         else:
-            if self.use_metadata:
-                return X, df.iloc[i]['metadata']
+            if self.use_metadata_num:
+                return X, self.metadata[i]
             else:
                 return X
     

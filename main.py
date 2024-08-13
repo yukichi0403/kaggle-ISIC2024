@@ -89,7 +89,7 @@ def load_model(args, fold):
             if args.use_metadata_num:
                 checkpoint = filter_backbone(checkpoint)
             model.load_state_dict(checkpoint, strict=False)
-            print(f"Loaded {'backbone' if args.use_metadata_num else 'full model'} from fold {fold+1}")
+            cprint(f"Loaded {'backbone' if args.use_metadata_num else 'full model'} from fold {fold+1}", "cyan")
 
     model.to(args.device)
     return model
