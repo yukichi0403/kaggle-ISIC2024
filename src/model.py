@@ -220,8 +220,21 @@ class CustomSwinModel(nn.Module):
         self.use_metadata = args.use_metadata_num is not None and args.use_metadata_num > 0
         if self.use_metadata:
             self.linear_main = nn.Linear(self.encoder.num_features * 2, args.num_classes)
+            self.block_1 = nn.Sequential(
+                nn.Linear(args.use_metadata_num, self.encoder.num_features * 4),
+                nn.BatchNorm1d(self.encoder.num_features * 4),
+                nn.SiLU(),
+                nn.Dropout(args.dropout),
+            )
+            self.block_2 = nn.Sequential(
+                nn.Linear(self.encoder.num_features * 4, self.encoder.num_features),
+                nn.BatchNorm1d(self.encoder.num_features),
+                nn.SiLU(),
+            )
         else:
             self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+
+        
 
         if self.aux_loss_features is not None:
             self.aux_dropout = nn.ModuleList([nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)]) for _ in self.aux_loss_features])
