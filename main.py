@@ -205,18 +205,20 @@ def configure_optimizers(model, args):
     if args.use_metadata_num:
         # メタデータブロックのパラメータを取得
         metadata_params = list(model.block_1.parameters()) + list(model.block_2.parameters())
+            # その他のパラメータを取得
+        other_params = [p for _, p in model.named_parameters() if not any(p is mp for mp in metadata_params)]
+        
+        # オプティマイザーを設定
+        optimizer = torch.optim.AdamW([
+            {'params': other_params},
+            {'params': metadata_params, 'lr': args.lr * args.metadata_head_weight}  # メタデータブロックの学習率を10分の1に設定
+        ], lr=args.lr, weight_decay=args.weight_decay)
         cprint(f"Set metadata backbone lr: {args.lr * args.metadata_head_weight}", "cyan")
     else:
         metadata_params = []
+        optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     
-    # その他のパラメータを取得
-    other_params = [p for _, p in model.named_parameters() if not any(p is mp for mp in metadata_params)]
-    
-    # オプティマイザーを設定
-    optimizer = torch.optim.AdamW([
-        {'params': other_params},
-        {'params': metadata_params, 'lr': args.lr * args.metadata_head_weight}  # メタデータブロックの学習率を10分の1に設定
-    ], lr=args.lr, weight_decay=args.weight_decay)
+
     
     return optimizer
 
@@ -226,14 +228,14 @@ def run(args: DictConfig):
     set_seed(args.seed)
     
     train = pd.read_csv(args.train_df_dir)
-    train ,_ ,_ = feature_engineering(train)
-    meta_cols = ['isic_id', 'target', 'fold', 'archive', 'clin_size_long_diam_mm', 'tbp_lv_A', 'tbp_lv_Aext','tbp_lv_B', 'tbp_lv_Bext', 'tbp_lv_C', 'tbp_lv_Cext', 'tbp_lv_H',
-                 'tbp_lv_Hext', 'tbp_lv_L', 'tbp_lv_Lext', 'tbp_lv_areaMM2','tbp_lv_area_perim_ratio', 'tbp_lv_color_std_mean', 'tbp_lv_deltaA',
-                 'tbp_lv_deltaB', 'tbp_lv_deltaL', 'tbp_lv_deltaLB', 'tbp_lv_deltaLBnorm', 'tbp_lv_eccentricity', 'tbp_lv_minorAxisMM',
-                 'tbp_lv_nevi_confidence', 'tbp_lv_norm_border', 'tbp_lv_norm_color', 'tbp_lv_perimeterMM', 'tbp_lv_radial_color_std_max', 
-                 'tbp_lv_stdL', 'tbp_lv_stdLExt', 'tbp_lv_symm_2axis', 'tbp_lv_symm_2axis_angle',
-                 'tbp_lv_x', 'tbp_lv_y', 'tbp_lv_z', ]
-    train = train[meta_cols]
+    #train ,_ ,_ = feature_engineering(train)
+    # meta_cols = ['isic_id', 'target', 'fold', 'archive', 'clin_size_long_diam_mm', 'tbp_lv_A', 'tbp_lv_Aext','tbp_lv_B', 'tbp_lv_Bext', 'tbp_lv_C', 'tbp_lv_Cext', 'tbp_lv_H',
+    #              'tbp_lv_Hext', 'tbp_lv_L', 'tbp_lv_Lext', 'tbp_lv_areaMM2','tbp_lv_area_perim_ratio', 'tbp_lv_color_std_mean', 'tbp_lv_deltaA',
+    #              'tbp_lv_deltaB', 'tbp_lv_deltaL', 'tbp_lv_deltaLB', 'tbp_lv_deltaLBnorm', 'tbp_lv_eccentricity', 'tbp_lv_minorAxisMM',
+    #              'tbp_lv_nevi_confidence', 'tbp_lv_norm_border', 'tbp_lv_norm_color', 'tbp_lv_perimeterMM', 'tbp_lv_radial_color_std_max', 
+    #              'tbp_lv_stdL', 'tbp_lv_stdLExt', 'tbp_lv_symm_2axis', 'tbp_lv_symm_2axis_angle',
+    #              'tbp_lv_x', 'tbp_lv_y', 'tbp_lv_z', ]
+    # train = train[meta_cols]
     
     logdir = "/kaggle/working/" if not args.COLAB else hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
     print(f"logdir: {logdir}")
