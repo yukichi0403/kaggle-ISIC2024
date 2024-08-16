@@ -124,8 +124,31 @@ class CustomModelEva(nn.Module):
             self.aux_dropout = nn.ModuleList([nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)]) for _ in self.aux_loss_features])
             self.aux_linear = nn.ModuleList([nn.Linear(self.encoder.num_features, outnum) for outnum in self.aux_loss_feature_outnum])
 
-    def forward(self, images):
+        self.use_metadata = args.use_metadata_num is not None and args.use_metadata_num > 0
+        if self.use_metadata:
+            self.linear_main = nn.Linear(self.encoder.num_features * 2, args.num_classes)
+            self.block_1 = nn.Sequential(
+                nn.Linear(args.use_metadata_num, self.encoder.num_features * 4),
+                nn.BatchNorm1d(self.encoder.num_features * 4),
+                nn.SiLU(),
+                nn.Dropout(args.dropout),
+            )
+            self.block_2 = nn.Sequential(
+                nn.Linear(self.encoder.num_features * 4, self.encoder.num_features),
+                nn.BatchNorm1d(self.encoder.num_features),
+                nn.SiLU(),
+            )
+        else:
+            self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+
+    def forward(self, images, metadata=None):
         out = self.encoder(images)
+
+        if self.use_metadata and metadata is not None:
+            meta_out = self.block_1(metadata)
+            meta_out = self.block_2(meta_out)
+            out = torch.cat([out, meta_out], dim=1)
+
         if self.training:
             main_out = 0
             for i in range(len(self.dropout_main)):
@@ -171,16 +194,37 @@ class CustomConvNextModel(nn.Module):
         self.layer_norm = LayerNorm2d(self.encoder.num_features)
         self.flatten = nn.Flatten()
         self.dropout_main = nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)])  # Dropout augmentation
-        self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
 
         if self.aux_loss_ratio is not None:
             self.dropout_aux = nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)])  # Dropout augmentation
             self.linear_aux = nn.Linear(self.encoder.num_features, 4)
+        
+        self.use_metadata = args.use_metadata_num is not None and args.use_metadata_num > 0
+        if self.use_metadata:
+            self.linear_main = nn.Linear(self.encoder.num_features * 2, args.num_classes)
+            self.block_1 = nn.Sequential(
+                nn.Linear(args.use_metadata_num, self.encoder.num_features * 4),
+                nn.BatchNorm1d(self.encoder.num_features * 4),
+                nn.SiLU(),
+                nn.Dropout(args.dropout),
+            )
+            self.block_2 = nn.Sequential(
+                nn.Linear(self.encoder.num_features * 4, self.encoder.num_features),
+                nn.BatchNorm1d(self.encoder.num_features),
+                nn.SiLU(),
+            )
+        else:
+            self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
 
-    def forward(self, images):
+    def forward(self, images, metadata=None):
         out = self.features(images)
         out = self.GAP(out)
         out = self.flatten(out)
+
+        if self.use_metadata and metadata is not None:
+            meta_out = self.block_1(metadata)
+            meta_out = self.block_2(meta_out)
+            out = torch.cat([out, meta_out], dim=1)
 
         if self.training:
             main_out = 0
@@ -316,6 +360,68 @@ class CustomModelResNet(nn.Module):
                     for i in range(len(aux_dropout)):
                         out_aux += aux_linear(aux_dropout[i](out))
                     out_aux = out_aux / len(aux_dropout)
+                    aux_outs.append(out_aux)
+                return main_out, aux_outs
+        else:
+            main_out = self.linear_main(out)
+
+        return main_out
+
+
+
+#######################
+#### CoatNet
+####################### 
+class CustomCoatnetModel(nn.Module):
+    def __init__(self, args, training: bool = True):
+        super(CustomCoatnetModel, self).__init__()
+        self.aux_loss_features = args.aux_loss_features
+        self.aux_loss_feature_outnum = args.aux_loss_feature_outnum
+
+        self.training = training
+        self.encoder = timm.create_model(args.model_name, pretrained=training,
+                                         drop_path_rate=args.drop_path_rate)
+        self.features = nn.Sequential(*list(self.encoder.children())[:-1])  # Remove the final classification layer
+        self.GeM = GeM(p=args.gem_p)
+        self.dropout_main = nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)])  # Dropout augmentation
+        
+        self.use_metadata = args.use_metadata_num is not None and args.use_metadata_num > 0
+        if self.use_metadata:
+            self.linear_main = nn.Linear(768 * 2, args.num_classes)
+            self.block_1 = nn.Sequential(
+                nn.Linear(args.use_metadata_num, 768 * 4),
+                nn.BatchNorm1d(768 * 4),
+                nn.SiLU(),
+                nn.Dropout(args.dropout),
+            )
+            self.block_2 = nn.Sequential(
+                nn.Linear(768 * 4, 768),
+                nn.BatchNorm1d(768),
+                nn.SiLU(),
+            )
+        else:
+            self.linear_main = nn.Linear(768, args.num_classes)
+
+        if self.aux_loss_features is not None:
+            self.aux_dropout = nn.ModuleList([nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)]) for _ in self.aux_loss_features])
+            self.aux_linear = nn.ModuleList([nn.Linear(768, outnum) for outnum in self.aux_loss_feature_outnum])
+
+    def forward(self, images, metadata=None):
+        out = self.features(images)
+        out = self.GeM(out).flatten(1)
+
+        if self.use_metadata and metadata is not None:
+            meta_out = self.block_1(metadata)
+            meta_out = self.block_2(meta_out)
+            out = torch.cat([out, meta_out], dim=1)
+
+        if self.training:
+            main_out = sum(self.linear_main(dropout(out)) for dropout in self.dropout_main) / len(self.dropout_main)
+
+            aux_outs = []
+            if self.aux_loss_features is not None:
+                for aux_dropout, aux_linear in zip(self.aux_dropout, self.aux_linear):
+                    out_aux = sum(aux_linear(dropout(out)) for dropout in aux_dropout) / len(aux_dropout)
                     aux_outs.append(out_aux)
                 return main_out, aux_outs
         else:
