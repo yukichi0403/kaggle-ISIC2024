@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder
 
 
-def read_data(path, cat_cols, num_cols, new_num_cols):
+def read_data(path, cat_cols, num_cols, new_num_cols, args):
     df = pd.read_csv(path, low_memory=False)
 
     # 'age_approx' の変換と欠損値の処理
