@@ -70,6 +70,8 @@ def load_model(args, fold):
         model = CustomModelEva(args, training=True).to(args.device)
     elif "resnext" in args.model_name:
         model = CustomModelResNet(args, training=True).to(args.device)
+    elif "coatnet" in args.model_name:
+        model = CustomCoatnetModel(args, training=True).to(args.device)
     else:
         raise ValueError(f"Model {args.model_name} not supported")
 
