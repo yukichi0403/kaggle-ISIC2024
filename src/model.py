@@ -182,7 +182,7 @@ class LayerNorm2d(nn.Module):
     def forward(self, x):
         return self.layer_norm(x)
 
-class CustomConvNextModel(nn.Module):
+class CustomConvEdgeNextModel(nn.Module):
     def __init__(self, args, training: bool = True):
         super(CustomConvNextModel, self).__init__()
         self.aux_loss_ratio = args.aux_loss_ratio
@@ -219,6 +219,7 @@ class CustomConvNextModel(nn.Module):
     def forward(self, images, metadata=None):
         out = self.features(images)
         out = self.GAP(out)
+        out = self.layer_norm(out)
         out = self.flatten(out)
 
         if self.use_metadata and metadata is not None:

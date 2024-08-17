@@ -65,8 +65,8 @@ def load_model(args, fold):
         model = CustomModel(args, training=True).to(args.device)
     elif "swin" in args.model_name:
         model = CustomSwinModel(args, training=True).to(args.device)
-    elif "convnext" in args.model_name:
-        model = CustomConvNextModel(args, training=True).to(args.device)
+    elif "convnext" in args.model_name or "edgenext" in args.model_name:
+        model = CustomConvEdgeNextModel(args, training=True).to(args.device)
     elif "eva" in args.model_name:
         model = CustomModelEva(args, training=True).to(args.device)
     elif "resnext" in args.model_name:
