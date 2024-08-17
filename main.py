@@ -21,6 +21,7 @@ from src.dataset import SkinCancerDataset
 from src.combo_loader import get_combo_loader
 from src.model import *
 from src.feature_engeneering import *
+from src.metric import *
 
 import torch.nn as nn
 
