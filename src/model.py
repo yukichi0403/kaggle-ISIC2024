@@ -184,7 +184,7 @@ class LayerNorm2d(nn.Module):
 
 class CustomConvEdgeNextModel(nn.Module):
     def __init__(self, args, training: bool = True):
-        super(CustomConvNextModel, self).__init__()
+        super(CustomConvEdgeNextModel, self).__init__()
         self.aux_loss_ratio = args.aux_loss_ratio
         self.training = training
         self.encoder = timm.create_model(args.model_name, pretrained=training,
