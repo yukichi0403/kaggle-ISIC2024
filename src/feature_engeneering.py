@@ -85,7 +85,7 @@ def read_data(path, cat_cols, num_cols, new_num_cols, args):
 
 
 
-def feature_engeneering_for_cnn(df):
+def feature_engeneering_for_cnn(df, err=1e-5):
     df_for_cnn = df.copy()
      # 'age_approx' の変換と欠損値の処理
     df_for_cnn['age_approx'] = df_for_cnn['age_approx'].replace('NA', np.nan).astype(float)
@@ -97,7 +97,7 @@ def feature_engeneering_for_cnn(df):
     df_for_cnn['luminance_contrast'] = (df_for_cnn['tbp_lv_L'] - df_for_cnn['tbp_lv_Lext']).abs()
     df_for_cnn['lesion_color_difference'] = np.sqrt(df_for_cnn['tbp_lv_deltaA'] ** 2 + df_for_cnn['tbp_lv_deltaB'] ** 2 + df_for_cnn['tbp_lv_deltaL'] ** 2)
     df_for_cnn['border_complexity'] = df_for_cnn['tbp_lv_norm_border'] + df_for_cnn['tbp_lv_symm_2axis']
-    df_for_cnn['color_uniformity'] = df_for_cnn['tbp_lv_color_std_mean'] / (df_for_cnn['tbp_lv_radial_color_std_max'] + args.err)
+    df_for_cnn['color_uniformity'] = df_for_cnn['tbp_lv_color_std_mean'] / (df_for_cnn['tbp_lv_radial_color_std_max'] + err)
     df_for_cnn['position_distance_3d'] = np.sqrt(df_for_cnn['tbp_lv_x'] ** 2 + df_for_cnn['tbp_lv_y'] ** 2 + df_for_cnn['tbp_lv_z'] ** 2)
     df_for_cnn['perimeter_to_area_ratio'] = df_for_cnn['tbp_lv_perimeterMM'] / df_for_cnn['tbp_lv_areaMM2']
     df_for_cnn['area_to_perimeter_ratio'] = df_for_cnn['tbp_lv_areaMM2'] / df_for_cnn['tbp_lv_perimeterMM']
