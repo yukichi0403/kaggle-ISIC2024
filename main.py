@@ -73,6 +73,8 @@ def load_model(args, fold):
         model = CustomModelResNet(args, training=True).to(args.device)
     elif "coatnet" in args.model_name:
         model = CustomCoatnetModel(args, training=True).to(args.device)
+    elif "resnet" in args.model_name:
+        model = CustomModelResNet(args, training=True).to(args.device)
     else:
         raise ValueError(f"Model {args.model_name} not supported")
 
