@@ -85,6 +85,47 @@ def read_data(path, cat_cols, num_cols, new_num_cols, args):
 
 
 
+def feature_engeneering_for_cnn(df):
+    df_for_cnn = df.copy()
+     # 'age_approx' の変換と欠損値の処理
+    df_for_cnn['age_approx'] = df_for_cnn['age_approx'].replace('NA', np.nan).astype(float)
+    df_for_cnn['age_approx'] = df_for_cnn['age_approx'].fillna(df_for_cnn['age_approx'].median())
+
+    # meta_cols のみを使用して常に計算する特徴量
+    df_for_cnn['lesion_size_ratio'] = df_for_cnn['tbp_lv_minorAxisMM'] / df_for_cnn['clin_size_long_diam_mm']
+    df_for_cnn['hue_contrast'] = (df_for_cnn['tbp_lv_H'] - df_for_cnn['tbp_lv_Hext']).abs()
+    df_for_cnn['luminance_contrast'] = (df_for_cnn['tbp_lv_L'] - df_for_cnn['tbp_lv_Lext']).abs()
+    df_for_cnn['lesion_color_difference'] = np.sqrt(df_for_cnn['tbp_lv_deltaA'] ** 2 + df_for_cnn['tbp_lv_deltaB'] ** 2 + df_for_cnn['tbp_lv_deltaL'] ** 2)
+    df_for_cnn['border_complexity'] = df_for_cnn['tbp_lv_norm_border'] + df_for_cnn['tbp_lv_symm_2axis']
+    df_for_cnn['color_uniformity'] = df_for_cnn['tbp_lv_color_std_mean'] / (df_for_cnn['tbp_lv_radial_color_std_max'] + args.err)
+    df_for_cnn['position_distance_3d'] = np.sqrt(df_for_cnn['tbp_lv_x'] ** 2 + df_for_cnn['tbp_lv_y'] ** 2 + df_for_cnn['tbp_lv_z'] ** 2)
+    df_for_cnn['perimeter_to_area_ratio'] = df_for_cnn['tbp_lv_perimeterMM'] / df_for_cnn['tbp_lv_areaMM2']
+    df_for_cnn['area_to_perimeter_ratio'] = df_for_cnn['tbp_lv_areaMM2'] / df_for_cnn['tbp_lv_perimeterMM']
+    df_for_cnn['lesion_visibility_score'] = df_for_cnn['tbp_lv_deltaLBnorm'] + df_for_cnn['tbp_lv_norm_color']
+    df_for_cnn['symmetry_border_consistency'] = df_for_cnn['tbp_lv_symm_2axis'] * df_for_cnn['tbp_lv_norm_border']
+    df_for_cnn['color_consistency'] = df_for_cnn['tbp_lv_stdL'] / df_for_cnn['tbp_lv_Lext']
+    df_for_cnn['hue_color_std_interaction'] = df_for_cnn['tbp_lv_H'] * df_for_cnn['tbp_lv_color_std_mean']
+    df_for_cnn['lesion_severity_index'] = (df_for_cnn['tbp_lv_norm_border'] + df_for_cnn['tbp_lv_norm_color'] + df_for_cnn['tbp_lv_eccentricity']) / 3
+    df_for_cnn['color_contrast_index'] = df_for_cnn['tbp_lv_deltaA'] + df_for_cnn['tbp_lv_deltaB'] + df_for_cnn['tbp_lv_deltaL'] + df_for_cnn['tbp_lv_deltaLBnorm']
+    df_for_cnn['log_lesion_area'] = np.log(df_for_cnn['tbp_lv_areaMM2'] + 1)
+    df_for_cnn['mean_hue_difference'] = (df_for_cnn['tbp_lv_H'] + df_for_cnn['tbp_lv_Hext']) / 2
+    df_for_cnn['std_dev_contrast'] = np.sqrt((df_for_cnn['tbp_lv_deltaA'] ** 2 + df_for_cnn['tbp_lv_deltaB'] ** 2 + df_for_cnn['tbp_lv_deltaL'] ** 2) / 3)
+    df_for_cnn['lesion_orientation_3d'] = np.arctan2(df_for_cnn['tbp_lv_y'], df_for_cnn['tbp_lv_x'])
+    df_for_cnn['overall_color_difference'] = (df_for_cnn['tbp_lv_deltaA'] + df_for_cnn['tbp_lv_deltaB'] + df_for_cnn['tbp_lv_deltaL']) / 3
+    df_for_cnn['symmetry_perimeter_interaction'] = df_for_cnn['tbp_lv_symm_2axis'] * df_for_cnn['tbp_lv_perimeterMM']
+    df_for_cnn['color_variance_ratio'] = df_for_cnn['tbp_lv_color_std_mean'] / df_for_cnn['tbp_lv_stdLExt']
+    df_for_cnn['border_color_interaction'] = df_for_cnn['tbp_lv_norm_border'] * df_for_cnn['tbp_lv_norm_color']
+    df_for_cnn['size_color_contrast_ratio'] = df_for_cnn['clin_size_long_diam_mm'] / df_for_cnn['tbp_lv_deltaLBnorm']
+    df_for_cnn['color_asymmetry_index'] = df_for_cnn['tbp_lv_radial_color_std_max'] * df_for_cnn['tbp_lv_symm_2axis']
+    df_for_cnn['volume_approximation_3d'] = df_for_cnn['tbp_lv_areaMM2'] * np.sqrt(df_for_cnn['tbp_lv_x']**2 + df_for_cnn['tbp_lv_y']**2 + df_for_cnn['tbp_lv_z']**2)
+    df_for_cnn['color_range'] = (df_for_cnn['tbp_lv_L'] - df_for_cnn['tbp_lv_Lext']).abs() + (df_for_cnn['tbp_lv_A'] - df_for_cnn['tbp_lv_Aext']).abs() + (df_for_cnn['tbp_lv_B'] - df_for_cnn['tbp_lv_Bext']).abs()
+    df_for_cnn['shape_color_consistency'] = df_for_cnn['tbp_lv_eccentricity'] * df_for_cnn['tbp_lv_color_std_mean']
+    df_for_cnn['border_length_ratio'] = df_for_cnn['tbp_lv_perimeterMM'] / (2 * np.pi * np.sqrt(df_for_cnn['tbp_lv_areaMM2'] / np.pi))
+    df_for_cnn['combined_anatomical_site'] = df_for_cnn['anatom_site_general'].astype(str) + '_' + df_for_cnn['tbp_lv_location'].astype(str)
+
+    return df_for_cnn
+
+
 def preprocess(df_train, df_test, feature_cols, cat_cols):
     
     encoder = OneHotEncoder(sparse_output=False, dtype=np.int32, handle_unknown='ignore')
