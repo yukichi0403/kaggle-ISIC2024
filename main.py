@@ -241,7 +241,10 @@ def run(args: DictConfig):
                  'tbp_lv_stdL', 'tbp_lv_stdLExt', 'tbp_lv_symm_2axis', 'tbp_lv_symm_2axis_angle',
                  'tbp_lv_x', 'tbp_lv_y', 'tbp_lv_z', ]
         train = train[meta_cols]
-        train = feature_engeneering_for_cnn(train)
+        # 'age_approx' の変換と欠損値の処理
+        train['age_approx'] = train['age_approx'].replace('NA', np.nan).astype(float)
+        train['age_approx'] = train['age_approx'].fillna(train['age_approx'].median())
+        #train = feature_engeneering_for_cnn(train)
         print(f"all columns num: {len(train.columns)}, feature num: {len(train.columns) - 4}")
     
     logdir = "/kaggle/working/" if not args.COLAB else hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
