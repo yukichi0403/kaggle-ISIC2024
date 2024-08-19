@@ -272,7 +272,13 @@ class CustomSwinModel(nn.Module):
                 nn.Dropout(args.dropout),
             )
             self.block_2 = nn.Sequential(
-                nn.Linear(self.encoder.num_features * 4, self.encoder.num_features),
+                nn.Linear(self.encoder.num_features * 4, self.encoder.num_features * 2),
+                nn.BatchNorm1d(self.encoder.num_features * 2),
+                nn.SiLU(),
+                nn.Dropout(args.dropout),
+            )
+            self.block_3 = nn.Sequential(
+                nn.Linear(self.encoder.num_features * 2, self.encoder.num_features),
                 nn.BatchNorm1d(self.encoder.num_features),
                 nn.SiLU(),
             )
@@ -292,6 +298,7 @@ class CustomSwinModel(nn.Module):
         if self.use_metadata and metadata is not None:
             meta_out = self.block_1(metadata)
             meta_out = self.block_2(meta_out)
+            meta_out = self.block_3(meta_out)
             out = torch.cat([out, meta_out], dim=1)
         
 

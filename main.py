@@ -209,8 +209,8 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
 def configure_optimizers(model, args):
     if args.use_metadata_num:
         # メタデータブロックのパラメータを取得
-        metadata_params = list(model.block_1.parameters()) + list(model.block_2.parameters())
-            # その他のパラメータを取得
+        metadata_params = list(model.block_1.parameters()) + list(model.block_2.parameters()) + list(model.block_3.parameters())
+        # その他のパラメータを取得
         other_params = [p for _, p in model.named_parameters() if not any(p is mp for mp in metadata_params)]
         
         # オプティマイザーを設定
