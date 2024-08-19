@@ -87,9 +87,6 @@ def read_data(path, cat_cols, num_cols, new_num_cols, args):
 
 def feature_engeneering_for_cnn(df, err=1e-5):
     df_for_cnn = df.copy()
-     # 'age_approx' の変換と欠損値の処理
-    df_for_cnn['age_approx'] = df_for_cnn['age_approx'].replace('NA', np.nan).astype(float)
-    df_for_cnn['age_approx'] = df_for_cnn['age_approx'].fillna(df_for_cnn['age_approx'].median())
 
     # meta_cols のみを使用して常に計算する特徴量
     df_for_cnn['lesion_size_ratio'] = df_for_cnn['tbp_lv_minorAxisMM'] / df_for_cnn['clin_size_long_diam_mm']
