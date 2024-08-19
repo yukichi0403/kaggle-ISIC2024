@@ -121,7 +121,6 @@ def feature_engeneering_for_cnn(df, err=1e-5):
     df_for_cnn['color_range'] = (df_for_cnn['tbp_lv_L'] - df_for_cnn['tbp_lv_Lext']).abs() + (df_for_cnn['tbp_lv_A'] - df_for_cnn['tbp_lv_Aext']).abs() + (df_for_cnn['tbp_lv_B'] - df_for_cnn['tbp_lv_Bext']).abs()
     df_for_cnn['shape_color_consistency'] = df_for_cnn['tbp_lv_eccentricity'] * df_for_cnn['tbp_lv_color_std_mean']
     df_for_cnn['border_length_ratio'] = df_for_cnn['tbp_lv_perimeterMM'] / (2 * np.pi * np.sqrt(df_for_cnn['tbp_lv_areaMM2'] / np.pi))
-    df_for_cnn['combined_anatomical_site'] = df_for_cnn['anatom_site_general'].astype(str) + '_' + df_for_cnn['tbp_lv_location'].astype(str)
 
     return df_for_cnn
 
