@@ -62,7 +62,13 @@ class CustomModel(nn.Module):
                 nn.Dropout(args.dropout),
             )
             self.block_2 = nn.Sequential(
-                nn.Linear(self.classifier_in_features * 4, self.classifier_in_features),
+                nn.Linear(self.classifier_in_features * 4, self.classifier_in_features * 2),
+                nn.BatchNorm1d(self.classifier_in_features * 2),
+                nn.SiLU(),
+                nn.Dropout(args.dropout),
+            )
+            self.block_3 = nn.Sequential(
+                nn.Linear(self.classifier_in_features * 2, self.classifier_in_features),
                 nn.BatchNorm1d(self.classifier_in_features),
                 nn.SiLU(),
             )
@@ -74,6 +80,7 @@ class CustomModel(nn.Module):
         if self.use_metadata and metadata is not None:
             meta_out = self.block_1(metadata)
             meta_out = self.block_2(meta_out)
+            meta_out = self.block_3(meta_out)
             out = torch.cat([out, meta_out], dim=1)
         
         if self.training:
@@ -417,7 +424,13 @@ class CustomCoatnetModel(nn.Module):
                 nn.Dropout(args.dropout),
             )
             self.block_2 = nn.Sequential(
-                nn.Linear(768 * 4, 768),
+                nn.Linear(768 * 4, 768 * 2),
+                nn.BatchNorm1d(768 * 2),
+                nn.SiLU(),
+                nn.Dropout(args.dropout),
+            )
+            self.block_3 = nn.Sequential(
+                nn.Linear(768 * 2, 768),
                 nn.BatchNorm1d(768),
                 nn.SiLU(),
             )
@@ -435,6 +448,7 @@ class CustomCoatnetModel(nn.Module):
         if self.use_metadata and metadata is not None:
             meta_out = self.block_1(metadata)
             meta_out = self.block_2(meta_out)
+            meta_out = self.block_3(meta_out)
             out = torch.cat([out, meta_out], dim=1)
 
         if self.training:
