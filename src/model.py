@@ -140,7 +140,7 @@ class CustomModelEva(nn.Module):
                 nn.Dropout(args.dropout),
             )
             self.block_3 = nn.Sequential(
-                nn.Linear(self.encoder.num_features * 4, self.encoder.num_features),
+                nn.Linear(self.encoder.num_features * 2, self.encoder.num_features),
                 nn.BatchNorm1d(self.encoder.num_features),
                 nn.SiLU(),
             )
