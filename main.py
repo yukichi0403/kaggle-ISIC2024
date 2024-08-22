@@ -296,14 +296,14 @@ def run(args: DictConfig):
                         max_pixel_value=255.0, 
                         p=1),
                         ToTensorV2()])
-        
+    
+    if args.use_wandb:
+        wandb.init(mode="online", dir=logdir, project="ISIC2024_v2", group=args.expname)
     for fold in range(args.num_splits):
         if fold not in args.use_fold:
             print(f"Test mode. Skipping fold{fold+1}")
             continue
         
-        if args.use_wandb:
-            wandb.init(mode="online", dir=logdir, project="ISIC2024")
 
         train_df = train[train["fold"] != fold]
         valid_df = train[train["fold"] == fold]
@@ -345,9 +345,15 @@ def run(args: DictConfig):
                 val_loss, val_score, val_auc = run_one_epoch(val_loader, model,  None, None, args, epoch, loss_func)
                 
             if args.use_wandb:
-                wandb.log({"train_loss": np.mean(train_loss), "train_score": np.mean(train_score), "train_auc": np.mean(train_auc), 
-                           "val_loss": np.mean(val_loss), "val_score": np.mean(val_score), "val_auc": np.mean(val_auc),
-                           "lr": current_lr})
+                wandb.log({
+                    f"fold{fold+1}/train_loss": np.mean(train_loss),
+                    f"fold{fold+1}/train_score": np.mean(train_score),
+                    f"fold{fold+1}/train_auc": np.mean(train_auc),
+                    f"fold{fold+1}/val_loss": np.mean(val_loss),
+                    f"fold{fold+1}/val_score": np.mean(val_score),
+                    f"fold{fold+1}/val_auc": np.mean(val_auc),
+                    f"fold{fold+1}/lr": current_lr
+                })
 
             if np.mean(val_score) > max_val_score:
                 cprint("New best.", "cyan")
@@ -364,7 +370,7 @@ def run(args: DictConfig):
             else:
                 no_improve_epochs += 1
                 if no_improve_epochs > args.early_stopping_rounds:
-                    cprint("Early stopping.", "cyan")
+                    cprint(f"Early stopping. No improvement for {no_improve_epochs} epochs.", "cyan")
                     break
 
         if args.local_dir:
@@ -377,8 +383,8 @@ def run(args: DictConfig):
                 shutil.copy(model_path, local_dir)
                 print(f'Model saved to Local: {local_dir}')
         
-        if args.use_wandb:
-            wandb.finish()
+    if args.use_wandb:
+        wandb.finish()
 
 
 if __name__ == "__main__":
