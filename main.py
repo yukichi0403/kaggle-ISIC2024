@@ -305,7 +305,7 @@ def run(args: DictConfig):
             "img_size": args.img_size,
             "batch_size": args.batch_size,
             "epochs": args.epochs,
-            "learning_rate": args.learning_rate,
+            "learning_rate": args.lr,
             "model_name": args.model_name,
             # 必要に応じて他のハイパーパラメータも追加
         }
