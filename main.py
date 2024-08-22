@@ -307,6 +307,7 @@ def run(args: DictConfig):
             "epochs": args.epochs,
             "learning_rate": args.lr,
             "model_name": args.model_name,
+            "use_metadata_num": args.use_metadata_num,
             # 必要に応じて他のハイパーパラメータも追加
         }
         wandb.init(mode="online", dir=logdir, project="ISIC2024_v2", group=args.expname, config=config)
