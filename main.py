@@ -305,7 +305,7 @@ def run(args: DictConfig):
             "img_size": args.img_size,
             "batch_size": args.batch_size,
             "epochs": args.epochs,
-            "learning_rate": args.learning_rate,
+            "learning_rate": args.lr,
             "model_name": args.model_name,
             # 必要に応じて他のハイパーパラメータも追加
         }
@@ -363,7 +363,8 @@ def run(args: DictConfig):
                     f"fold{fold+1}/val_loss": np.mean(val_loss),
                     f"fold{fold+1}/val_score": np.mean(val_score),
                     f"fold{fold+1}/val_auc": np.mean(val_auc),
-                    f"fold{fold+1}/lr": current_lr
+                    f"fold{fold+1}/lr": current_lr,
+                    "epoch": epoch
                 })
 
             if np.mean(val_score) > max_val_score:
