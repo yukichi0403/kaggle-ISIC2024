@@ -298,7 +298,18 @@ def run(args: DictConfig):
                         ToTensorV2()])
     
     if args.use_wandb:
-        wandb.init(mode="online", dir=logdir, project="ISIC2024_v2", group=args.expname)
+        config = {
+            "dropout": args.dropout,
+            "drop_path_rate": args.drop_path_rate,
+            "sampling_rate": args.sampling_rate,
+            "img_size": args.img_size,
+            "batch_size": args.batch_size,
+            "epochs": args.epochs,
+            "learning_rate": args.learning_rate,
+            "model_name": args.model_name,
+            # 必要に応じて他のハイパーパラメータも追加
+        }
+        wandb.init(mode="online", dir=logdir, project="ISIC2024_v2", group=args.expname, config=config)
     for fold in range(args.num_splits):
         if fold not in args.use_fold:
             print(f"Test mode. Skipping fold{fold+1}")
