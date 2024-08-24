@@ -251,51 +251,7 @@ def run(args: DictConfig):
     print(f"logdir: {logdir}")
         
     loader_args = {"batch_size": args.batch_size, "num_workers": args.num_workers}
-    train_transform = A.Compose([  
-                                    A.Resize(args.img_size, args.img_size),
-                                    A.Flip(p=0.5),                      
-                                    A.Transpose(p=0.5),
-
-                                    A.RandomBrightnessContrast(
-                                                            brightness_limit=(-0.1,0.1), 
-                                                            contrast_limit=(-0.1, 0.1), 
-                                                            p=0.5),
-                                    
-                                    A.OneOf([
-                                        A.MotionBlur(blur_limit=5),
-                                        A.MedianBlur(blur_limit=5),
-                                        A.GaussianBlur(blur_limit=5),
-                                    ], p=0.3),  # 確率を0.7から0.3に下げる
-
-                                    A.CLAHE(clip_limit=2.0, p=0.5),  
-
-                                    A.HueSaturationValue(
-                                                            hue_shift_limit=0.2, 
-                                                            sat_shift_limit=0.2, 
-                                                            val_shift_limit=0.2, 
-                                                            p=0.5
-                                                        ),
-                                    
-                                    A.ShiftScaleRotate(shift_limit=0.1, 
-                                                                        scale_limit=0.15, 
-                                                                        rotate_limit=60, 
-                                                                        p=0.5),
-                                    
-                                    A.Normalize(
-                                        mean=[0.485, 0.456, 0.406], 
-                                        std=[0.229, 0.224, 0.225], 
-                                        max_pixel_value=255.0, 
-                                        p=1),
-                                    ToTensorV2()], 
-                                                            p=1.)
-    val_transforms  = A.Compose([                        
-                        A.Resize(args.img_size,args.img_size),
-                        A.Normalize(
-                        mean=[0.485, 0.456, 0.406], 
-                        std=[0.229, 0.224, 0.225], 
-                        max_pixel_value=255.0, 
-                        p=1),
-                        ToTensorV2()])
+    train_transform, val_transform = get_transforms(args.img_size)
     
     if args.use_wandb:
         config = {
@@ -327,7 +283,7 @@ def run(args: DictConfig):
         # ------------------
         #    Dataloader
         # ------------------
-        train_loader, val_loader = get_dataset_and_loader(loader_args, train_df, valid_df, train_transform, val_transforms, args)
+        train_loader, val_loader = get_dataset_and_loader(loader_args, train_df, valid_df, train_transform, val_transform, args)
 
         model = load_model(args, fold)
 
