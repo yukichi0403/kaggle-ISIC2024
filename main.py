@@ -17,7 +17,7 @@ import wandb
 from sklearn.model_selection import GroupKFold, StratifiedKFold
 
 from src.utils import *
-from src.dataset import SkinCancerDataset
+from src.dataset import SkinCancerDataset, get_transforms
 from src.combo_loader import get_combo_loader
 from src.model import *
 from src.feature_engeneering import *
