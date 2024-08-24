@@ -251,7 +251,7 @@ def run(args: DictConfig):
     print(f"logdir: {logdir}")
         
     loader_args = {"batch_size": args.batch_size, "num_workers": args.num_workers}
-    train_transform, val_transform = get_transforms(args.img_size)
+    train_transform, val_transform = get_transforms(args.img_size, args.augmentation_strength)
     
     if args.use_wandb:
         config = {

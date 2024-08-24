@@ -162,32 +162,59 @@ class SkinCancerDataset(Dataset):
         return sample_image.shape[0]
     
 
-def get_transforms(image_size):
-    transforms_train = A.Compose([
+def get_transforms(image_size, augmentation_strength='strong'):
+    if augmentation_strength not in ['strong', 'weak']:
+        raise ValueError("augmentation_strength must be either 'strong' or 'weak'")
+
+    # 共通の変換
+    common_transforms = [
         A.RandomResizedCrop(height=image_size, width=image_size, scale=(0.8, 1.0)),
-        A.Transpose(p=0.5),
-        A.VerticalFlip(p=0.5),
         A.HorizontalFlip(p=0.5),
-        A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.75),
-        A.OneOf([
-            A.MotionBlur(blur_limit=5),
-            A.MedianBlur(blur_limit=5),
-            A.GaussianBlur(blur_limit=5),
-            A.GaussNoise(var_limit=(5.0, 30.0)),
-        ], p=0.7),
-        A.OneOf([
-            A.OpticalDistortion(distort_limit=1.0),
-            A.GridDistortion(num_steps=5, distort_limit=1.),
-            A.ElasticTransform(alpha=3),
-        ], p=0.7),
-        A.CLAHE(clip_limit=4.0, p=0.7),
-        A.HueSaturationValue(hue_shift_limit=10, sat_shift_limit=20, val_shift_limit=10, p=0.5),
-        A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=15, border_mode=0, p=0.85),
-        A.CoarseDropout(max_holes=8, max_height=int(image_size * 0.375), max_width=int(image_size * 0.375), 
-        min_holes=5, min_height=int(image_size * 0.09), min_width=int(image_size * 0.09), fill_value=0, p=0.7),
+        A.VerticalFlip(p=0.5),
         A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], max_pixel_value=255.0, p=1.0),
         ToTensorV2()
-    ])
+    ]
+
+    if augmentation_strength == 'strong':
+        transforms_train = A.Compose([
+            *common_transforms[:3],  # RandomResizedCrop, HorizontalFlip, VerticalFlip
+            A.Transpose(p=0.5),
+            A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=0.75),
+            A.OneOf([
+                A.MotionBlur(blur_limit=5),
+                A.MedianBlur(blur_limit=5),
+                A.GaussianBlur(blur_limit=5),
+                A.GaussNoise(var_limit=(5.0, 30.0)),
+            ], p=0.7),
+            A.OneOf([
+                A.OpticalDistortion(distort_limit=1.0),
+                A.GridDistortion(num_steps=5, distort_limit=1.),
+                A.ElasticTransform(alpha=3),
+            ], p=0.7),
+            A.CLAHE(clip_limit=4.0, p=0.7),
+            A.HueSaturationValue(hue_shift_limit=10, sat_shift_limit=20, val_shift_limit=10, p=0.5),
+            A.ShiftScaleRotate(shift_limit=0.1, scale_limit=0.1, rotate_limit=15, border_mode=0, p=0.85),
+            A.CoarseDropout(max_holes=8, max_height=int(image_size * 0.375), max_width=int(image_size * 0.375), 
+                            min_holes=5, min_height=int(image_size * 0.09), min_width=int(image_size * 0.09), 
+                            fill_value=0, p=0.7),
+            *common_transforms[-2:]  # Normalize, ToTensorV2
+        ])
+    else:  # weak augmentation
+        transforms_train = A.Compose([
+            *common_transforms[:3],  # RandomResizedCrop, HorizontalFlip, VerticalFlip
+            A.RandomBrightnessContrast(brightness_limit=0.1, contrast_limit=0.1, p=0.5),
+            A.OneOf([
+                A.MotionBlur(blur_limit=3),
+                A.GaussianBlur(blur_limit=3),
+                A.GaussNoise(var_limit=(5.0, 20.0)),
+            ], p=0.3),
+            A.HueSaturationValue(hue_shift_limit=5, sat_shift_limit=10, val_shift_limit=5, p=0.3),
+            A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.05, rotate_limit=10, border_mode=0, p=0.5),
+            A.CoarseDropout(max_holes=4, max_height=int(image_size * 0.1), max_width=int(image_size * 0.1), 
+                            min_holes=1, min_height=int(image_size * 0.05), min_width=int(image_size * 0.05), 
+                            fill_value=0, p=0.5),
+            *common_transforms[-2:]  # Normalize, ToTensorV2
+        ])
 
     transforms_val = A.Compose([
         A.Resize(image_size, image_size),

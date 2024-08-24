@@ -45,3 +45,4 @@ use_metadata_num: 0
 metadata_head_weight: 
 
 pseudo_label: False
+augmentation_strength: strong
