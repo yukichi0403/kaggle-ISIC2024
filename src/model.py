@@ -5,6 +5,27 @@ import timm
 from timm.layers.adaptive_avgmax_pool import SelectAdaptivePool2d
 
 
+class AttentionFusion(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.attention = nn.MultiheadAttention(embed_dim=dim, num_heads=8)
+        
+    def forward(self, image_features, metadata_features):
+        # image_features: [batch_size, dim]
+        # metadata_features: [batch_size, dim]
+        
+        # Reshape for attention: [seq_len, batch_size, dim]
+        image_features = image_features.unsqueeze(0)
+        metadata_features = metadata_features.unsqueeze(0)
+        
+        # Perform attention
+        fused_features, _ = self.attention(image_features, metadata_features, metadata_features)
+        
+        # Reshape back: [batch_size, dim]
+        return fused_features.squeeze(0)
+
+
+
 #######################
 #### EfficientNet
 #######################
@@ -281,52 +302,49 @@ class CustomSwinModel(nn.Module):
                                          drop_path_rate=args.drop_path_rate)
         self.features = nn.Sequential(*list(self.encoder.children())[:-1])
         self.GAP = SelectAdaptivePool2d(pool_type='avg', input_fmt='NHWC', flatten=True)
-        self.dropout_main = nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)])  # Dropout augmentation
+        self.dropout_main = nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)])
         
         self.use_metadata = args.use_metadata_num is not None and args.use_metadata_num > 0
         if self.use_metadata:
-            self.linear_main = nn.Linear(self.encoder.num_features * 2, args.num_classes)
-            self.block_1 = nn.Sequential(
-                nn.Linear(args.use_metadata_num, self.encoder.num_features * 4),
-                nn.BatchNorm1d(self.encoder.num_features * 4),
+            self.metadata_dim = self.encoder.num_features  # Set metadata dimension same as image features
+            
+            self.metadata_encoder = nn.Sequential(
+                nn.Linear(args.use_metadata_num, self.metadata_dim * 4),
+                nn.BatchNorm1d(self.metadata_dim * 4),
                 nn.SiLU(),
                 nn.Dropout(args.dropout),
-            )
-            self.block_2 = nn.Sequential(
-                nn.Linear(self.encoder.num_features * 4, self.encoder.num_features * 2),
-                nn.BatchNorm1d(self.encoder.num_features * 2),
+                nn.Linear(self.metadata_dim * 4, self.metadata_dim * 2),
+                nn.BatchNorm1d(self.metadata_dim * 2),
                 nn.SiLU(),
                 nn.Dropout(args.dropout),
-            )
-            self.block_3 = nn.Sequential(
-                nn.Linear(self.encoder.num_features * 2, self.encoder.num_features),
-                nn.BatchNorm1d(self.encoder.num_features),
+                nn.Linear(self.metadata_dim * 2, self.metadata_dim),
+                nn.BatchNorm1d(self.metadata_dim),
                 nn.SiLU(),
             )
+            
+            self.attention_fusion = AttentionFusion(dim=self.encoder.num_features)
+            self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
         else:
             self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
-
-        
 
         if self.aux_loss_features is not None:
             self.aux_dropout = nn.ModuleList([nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)]) for _ in self.aux_loss_features])
             self.aux_linear = nn.ModuleList([nn.Linear(self.encoder.num_features, outnum) for outnum in self.aux_loss_feature_outnum])
 
     def forward(self, images, metadata=None):
-        out = self.features(images)
-        out = self.GAP(out)
+        image_features = self.features(images)
+        image_features = self.GAP(image_features)
 
         if self.use_metadata and metadata is not None:
-            meta_out = self.block_1(metadata)
-            meta_out = self.block_2(meta_out)
-            meta_out = self.block_3(meta_out)
-            out = torch.cat([out, meta_out], dim=1)
-        
+            metadata_features = self.metadata_encoder(metadata)
+            fused_features = self.attention_fusion(image_features, metadata_features)
+        else:
+            fused_features = image_features
 
         if self.training:
             main_out = 0
             for i in range(len(self.dropout_main)):
-                main_out += self.linear_main(self.dropout_main[i](out))
+                main_out += self.linear_main(self.dropout_main[i](fused_features))
             main_out = main_out / len(self.dropout_main)
 
             aux_outs = []
@@ -334,12 +352,12 @@ class CustomSwinModel(nn.Module):
                 for aux_dropout, aux_linear in zip(self.aux_dropout, self.aux_linear):
                     out_aux = 0
                     for i in range(len(aux_dropout)):
-                        out_aux += aux_linear(aux_dropout[i](out))
+                        out_aux += aux_linear(aux_dropout[i](fused_features))
                     out_aux = out_aux / len(aux_dropout)
                     aux_outs.append(out_aux)
                 return main_out, aux_outs
         else:
-            main_out = self.linear_main(out)
+            main_out = self.linear_main(fused_features)
 
         return main_out
     
