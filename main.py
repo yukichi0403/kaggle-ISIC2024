@@ -237,7 +237,19 @@ def configure_optimizers(model, args):
 def run(args: DictConfig): 
     print(args)
     set_seed(args.seed)
-    
+
+    logdir = "/kaggle/working/" if not args.COLAB else hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
+    print(f"logdir: {logdir}")
+
+    if args.use_metadata_num > 150 and args.local_dir:
+            # Localにコピー
+            local_dir = os.path.join(args.local_dir, f"{args.expname}_{args.ver}")
+            os.makedirs(local_dir, exist_ok=True)
+            encoder_path = os.path.join(logdir, f"onehot_encoder.joblib")
+            if os.path.exists(encoder_path):
+                shutil.copy(encoder_path, local_dir)
+                print(f'Encoder saved to Local: {local_dir}')
+
     
     if args.use_metadata_num:
         train['age_approx'] = train['age_approx'].replace('NA', np.nan).astype(float)
@@ -263,13 +275,12 @@ def run(args: DictConfig):
             train[cat_cols] = cat_imputer.fit_transform(train[cat_cols])
 
             train = read_data(args.train_df_dir, cat_cols, num_cols, new_num_cols)
-            train, new_cat_cols = prepare_data_for_training(train, cat_cols, num_cols + new_num_cols)
+            train, new_cat_cols = prepare_data_for_training(train, cat_cols, num_cols + new_num_cols, logdir)
             feature_cols = new_cat_cols + num_cols + new_num_cols + other_cols
             train = train[['isic_id', 'target', 'fold', 'archive'] + feature_cols]
         print(f"all columns num: {len(train.columns)}, feature num: {len(train.columns) - 4}")
     
-    logdir = "/kaggle/working/" if not args.COLAB else hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
-    print(f"logdir: {logdir}")
+    
         
     loader_args = {"batch_size": args.batch_size, "num_workers": args.num_workers}
     train_transform, val_transform = get_transforms(args.img_size, args.augmentation_strength)
