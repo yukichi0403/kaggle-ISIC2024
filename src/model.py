@@ -307,25 +307,25 @@ class CustomSwinModel(nn.Module):
         self.use_metadata = args.use_metadata_num is not None and args.use_metadata_num > 0
         if self.use_metadata:            
             self.metadata_encoder = nn.Sequential(
-                nn.Linear(args.use_metadata_num, self.use_metadata_num * 4),
-                nn.BatchNorm1d(self.use_metadata_num * 4),
+                nn.Linear(args.use_metadata_num, args.use_metadata_num * 4),
+                nn.BatchNorm1d(args.use_metadata_num * 4),
                 nn.SiLU(),
                 nn.Dropout(args.dropout),
-                nn.Linear(self.use_metadata_num * 4, self.use_metadata_num * 2),
-                nn.BatchNorm1d(self.use_metadata_num * 2),
+                nn.Linear(args.use_metadata_num * 4, args.use_metadata_num * 2),
+                nn.BatchNorm1d(args.use_metadata_num * 2),
                 nn.SiLU(),
                 nn.Dropout(args.dropout),
-                nn.Linear(self.use_metadata_num * 2, self.use_metadata_num),
-                nn.BatchNorm1d(self.use_metadata_num),
+                nn.Linear(args.use_metadata_num * 2, args.use_metadata_num),
+                nn.BatchNorm1d(args.use_metadata_num),
                 nn.SiLU(),
             )
             
             self.fusion = args.fusion_method  # New argument for fusion method
             if self.fusion == 'concat':
-                self.linear_main = nn.Linear(self.encoder.num_features + self.use_metadata_num, args.num_classes)
+                self.linear_main = nn.Linear(self.encoder.num_features + args.use_metadata_num, args.num_classes)
             elif self.fusion == 'gated':
                 self.gate = nn.Sequential(
-                    nn.Linear(self.encoder.num_features + self.use_metadata_num, self.encoder.num_features),
+                    nn.Linear(self.encoder.num_features + args.use_metadata_num, self.encoder.num_features),
                     nn.Sigmoid()
                 )
                 self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
