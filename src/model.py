@@ -306,7 +306,7 @@ class CustomSwinModel(nn.Module):
         
         self.use_metadata = args.use_metadata_num is not None and args.use_metadata_num > 0
         if self.use_metadata:
-            self.metadata_dim = self.encoder.num_features  # Set metadata dimension same as image features
+            self.metadata_dim = args.metadata_dim  # New argument for metadata dimension
             
             self.metadata_encoder = nn.Sequential(
                 nn.Linear(args.use_metadata_num, self.metadata_dim * 4),
@@ -322,8 +322,17 @@ class CustomSwinModel(nn.Module):
                 nn.SiLU(),
             )
             
-            self.attention_fusion = AttentionFusion(dim=self.encoder.num_features)
-            self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+            self.fusion = args.fusion_method  # New argument for fusion method
+            if self.fusion == 'concat':
+                self.linear_main = nn.Linear(self.encoder.num_features + self.metadata_dim, args.num_classes)
+            elif self.fusion == 'gated':
+                self.gate = nn.Sequential(
+                    nn.Linear(self.encoder.num_features + self.metadata_dim, self.encoder.num_features),
+                    nn.Sigmoid()
+                )
+                self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+            else:
+                self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
         else:
             self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
 
@@ -337,7 +346,15 @@ class CustomSwinModel(nn.Module):
 
         if self.use_metadata and metadata is not None:
             metadata_features = self.metadata_encoder(metadata)
-            fused_features = self.attention_fusion(image_features, metadata_features)
+            
+            if self.fusion == 'concat':
+                fused_features = torch.cat([image_features, metadata_features], dim=1)
+            elif self.fusion == 'gated':
+                concat_features = torch.cat([image_features, metadata_features], dim=1)
+                gate = self.gate(concat_features)
+                fused_features = image_features * gate
+            else:
+                fused_features = image_features
         else:
             fused_features = image_features
 

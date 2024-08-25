@@ -46,3 +46,4 @@ metadata_head_weight:
 
 pseudo_label: False
 augmentation_strength: strong
+fusion_method: concat
