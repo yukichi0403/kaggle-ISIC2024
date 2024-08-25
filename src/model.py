@@ -312,8 +312,8 @@ class CustomSwinModel(nn.Module):
                 nn.BatchNorm1d(args.metadata_dim),
                 nn.SiLU(),
                 nn.Dropout(0.3),
-                nn.Linear(args.metadata_dim, args.encoder.num_features),
-                nn.BatchNorm1d(args.encoder.num_features),
+                nn.Linear(args.metadata_dim, self.encoder.num_features),
+                nn.BatchNorm1d(self.encoder.num_features),
                 nn.SiLU(),
             )
             
