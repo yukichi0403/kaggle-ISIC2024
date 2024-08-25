@@ -329,6 +329,9 @@ class CustomSwinModel(nn.Module):
                     nn.Sigmoid()
                 )
                 self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+            elif self.fusion == 'attention':
+                self.attention_fusion = AttentionFusion(dim=self.encoder.num_features)
+                self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
             else:
                 self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
         else:
@@ -351,6 +354,8 @@ class CustomSwinModel(nn.Module):
                 concat_features = torch.cat([image_features, metadata_features], dim=1)
                 gate = self.gate(concat_features)
                 fused_features = image_features * gate
+            elif self.fusion == 'attention':
+                fused_features = self.attention_fusion(image_features, metadata_features)
             else:
                 fused_features = image_features
         else:

@@ -212,6 +212,8 @@ def configure_optimizers(model, args):
         metadata_params = list(model.metadata_encoder.parameters()) + list(model.linear_main.parameters())
         if args.fusion_method == 'gated':
           metadata_params += list(model.gate.parameters())
+        elif args.fusion_method == 'attention':
+          metadata_params += list(model.attention_fusion.parameters())
         # その他のパラメータを取得
         other_params = [p for _, p in model.named_parameters() if not any(p is mp for mp in metadata_params)]
         
