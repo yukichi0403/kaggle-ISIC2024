@@ -307,16 +307,12 @@ class CustomSwinModel(nn.Module):
         self.use_metadata = args.use_metadata_num is not None and args.use_metadata_num > 0
         if self.use_metadata:            
             self.metadata_encoder = nn.Sequential(
-                nn.Linear(args.use_metadata_num, args.use_metadata_num * 4),
-                nn.BatchNorm1d(args.use_metadata_num * 4),
+                nn.Linear(args.use_metadata_num, args.metadata_dim),
+                nn.BatchNorm1d(args.metadata_dim),
                 nn.SiLU(),
-                nn.Dropout(args.dropout),
-                nn.Linear(args.use_metadata_num * 4, args.use_metadata_num * 2),
-                nn.BatchNorm1d(args.use_metadata_num * 2),
-                nn.SiLU(),
-                nn.Dropout(args.dropout),
-                nn.Linear(args.use_metadata_num * 2, args.use_metadata_num),
-                nn.BatchNorm1d(args.use_metadata_num),
+                nn.Dropout(0.3),
+                nn.Linear(args.metadata_dim, args.encoder.num_features),
+                nn.BatchNorm1d(args.encoder.num_features),
                 nn.SiLU(),
             )
             

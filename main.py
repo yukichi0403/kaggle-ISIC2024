@@ -271,6 +271,7 @@ def run(args: DictConfig):
             "metadata_head_weight": args.metadata_head_weight,
             "augmentation_strength": args.augmentation_strength,
             "fusion_method": args.fusion_method,
+            "metadata_dim": args.metadata_dim,
             # 必要に応じて他のハイパーパラメータも追加
         }
         wandb.init(mode="online", dir=logdir, project="ISIC2024_v2", group=args.expname, config=config)

@@ -43,6 +43,7 @@ aux_task_reg:
 aux_loss_feature_outnum:
 use_metadata_num: 0
 metadata_head_weight: 
+metadata_dim: 512
 
 pseudo_label: False
 augmentation_strength: strong
