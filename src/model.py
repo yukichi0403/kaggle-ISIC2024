@@ -319,7 +319,7 @@ class CustomSwinModel(nn.Module):
             
             self.fusion = args.fusion_method  # New argument for fusion method
             if self.fusion == 'concat':
-                self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+                self.linear_main = nn.Linear(self.encoder.num_features * 2, args.num_classes)
             elif self.fusion == 'gated':
                 self.gate = nn.Sequential(
                     nn.Linear(self.encoder.num_features * 2, self.encoder.num_features),

@@ -15,6 +15,7 @@ import shutil
 import wandb
 
 from sklearn.model_selection import GroupKFold, StratifiedKFold
+from sklearn.impute import SimpleImputer
 
 from src.utils import *
 from src.dataset import SkinCancerDataset, get_transforms
@@ -24,6 +25,7 @@ from src.feature_engeneering import *
 from src.metric import *
 
 import torch.nn as nn
+
 
 # Classのサンプル数のバランスを取るための関数
 def sampling(train, ratio=1):
@@ -236,19 +238,34 @@ def run(args: DictConfig):
     print(args)
     set_seed(args.seed)
     
-    train = pd.read_csv(args.train_df_dir)
+    
     if args.use_metadata_num:
-        meta_cols = ['isic_id', 'target', 'fold', 'archive', 'age_approx','clin_size_long_diam_mm', 'tbp_lv_A', 'tbp_lv_Aext','tbp_lv_B', 'tbp_lv_Bext', 'tbp_lv_C', 'tbp_lv_Cext', 'tbp_lv_H',
-                 'tbp_lv_Hext', 'tbp_lv_L', 'tbp_lv_Lext', 'tbp_lv_areaMM2','tbp_lv_area_perim_ratio', 'tbp_lv_color_std_mean', 'tbp_lv_deltaA',
-                 'tbp_lv_deltaB', 'tbp_lv_deltaL', 'tbp_lv_deltaLB', 'tbp_lv_deltaLBnorm', 'tbp_lv_eccentricity', 'tbp_lv_minorAxisMM',
-                 'tbp_lv_nevi_confidence', 'tbp_lv_norm_border', 'tbp_lv_norm_color', 'tbp_lv_perimeterMM', 'tbp_lv_radial_color_std_max', 
-                 'tbp_lv_stdL', 'tbp_lv_stdLExt', 'tbp_lv_symm_2axis', 'tbp_lv_symm_2axis_angle',
-                 'tbp_lv_x', 'tbp_lv_y', 'tbp_lv_z', ]
-        train = train[meta_cols]
-        # 'age_approx' の変換と欠損値の処理
         train['age_approx'] = train['age_approx'].replace('NA', np.nan).astype(float)
         train['age_approx'] = train['age_approx'].fillna(train['age_approx'].median())
-        train = feature_engeneering_for_cnn(train)
+        if args.use_metadata_num < 150:
+            train = pd.read_csv(args.train_df_dir)
+            meta_cols = ['isic_id', 'target', 'fold', 'archive', 'age_approx','clin_size_long_diam_mm', 'tbp_lv_A', 'tbp_lv_Aext','tbp_lv_B', 'tbp_lv_Bext', 'tbp_lv_C', 'tbp_lv_Cext', 'tbp_lv_H',
+                    'tbp_lv_Hext', 'tbp_lv_L', 'tbp_lv_Lext', 'tbp_lv_areaMM2','tbp_lv_area_perim_ratio', 'tbp_lv_color_std_mean', 'tbp_lv_deltaA',
+                    'tbp_lv_deltaB', 'tbp_lv_deltaL', 'tbp_lv_deltaLB', 'tbp_lv_deltaLBnorm', 'tbp_lv_eccentricity', 'tbp_lv_minorAxisMM',
+                    'tbp_lv_nevi_confidence', 'tbp_lv_norm_border', 'tbp_lv_norm_color', 'tbp_lv_perimeterMM', 'tbp_lv_radial_color_std_max', 
+                    'tbp_lv_stdL', 'tbp_lv_stdLExt', 'tbp_lv_symm_2axis', 'tbp_lv_symm_2axis_angle',
+                    'tbp_lv_x', 'tbp_lv_y', 'tbp_lv_z', ]
+            train = train[meta_cols]
+            # 'age_approx' の変換と欠損値の処理
+            train = feature_engeneering_for_cnn(train)
+        else:
+            cat_cols, num_cols, new_num_cols, other_cols = get_feature_cols()
+            # 数値型特徴量の欠損値を中央値で補完
+            num_imputer = SimpleImputer(strategy='median')
+            train[num_cols] = num_imputer.fit_transform(train[num_cols])
+            # カテゴリ型特徴量の欠損値を最頻値で補完
+            cat_imputer = SimpleImputer(strategy='most_frequent')
+            train[cat_cols] = cat_imputer.fit_transform(train[cat_cols])
+
+            train = read_data(args.train_df_dir, cat_cols, num_cols, new_num_cols)
+            train, new_cat_cols = prepare_data_for_training(train, cat_cols, num_cols + new_num_cols)
+            feature_cols = new_cat_cols + num_cols + new_num_cols + other_cols
+            train = train[['isic_id', 'target', 'fold', 'archive'] + feature_cols]
         print(f"all columns num: {len(train.columns)}, feature num: {len(train.columns) - 4}")
     
     logdir = "/kaggle/working/" if not args.COLAB else hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
