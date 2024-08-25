@@ -5,6 +5,7 @@ import timm
 from timm.layers.adaptive_avgmax_pool import SelectAdaptivePool2d
 
 
+
 class AttentionFusion(nn.Module):
     def __init__(self, dim):
         super().__init__()
