@@ -48,3 +48,4 @@ metadata_dim: 512
 pseudo_label: False
 augmentation_strength: strong
 fusion_method: concat
+metadata_head_type: linear
