@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder
 import joblib
+import os
 
 class CustomOneHotEncoder:
     def __init__(self, categorical_columns):

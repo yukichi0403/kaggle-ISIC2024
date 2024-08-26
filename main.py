@@ -157,7 +157,6 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
             y_pred, aux_outs = model(inputs)
         else:
             y_pred = model(inputs)
-        print(f"y_pred shape: {y_pred.shape}")
 
         if (isinstance(loss_func, torch.nn.BCEWithLogitsLoss) or isinstance(loss_func, torch.nn.BCELoss)):
             y_pred = y_pred.squeeze()
@@ -175,30 +174,30 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
                     aux_labels = aux_features[aux_feature].to(args.device).long()
                     loss += nn.CrossEntropyLoss()(aux_out, aux_labels.long()) * aux_weight
 
-    # 予測値とラベルを保存
-    if isinstance(loss_func, nn.BCEWithLogitsLoss):
-        pred = y_pred.sigmoid().cpu().detach().numpy()
-    elif isinstance(loss_func, nn.BCELoss):
-        pred = y_pred.cpu().detach().numpy()
-    elif isinstance(loss_func, nn.CrossEntropyLoss):
-        pred = y_pred[:,1].cpu().detach().numpy()
+        # 予測値とラベルを保存
+        if isinstance(loss_func, nn.BCEWithLogitsLoss):
+            pred = y_pred.sigmoid().cpu().detach().numpy()
+        elif isinstance(loss_func, nn.BCELoss):
+            pred = y_pred.cpu().detach().numpy()
+        elif isinstance(loss_func, nn.CrossEntropyLoss):
+            pred = y_pred[:,1].cpu().detach().numpy()
 
-    # 形状を統一
-    pred = pred.reshape(-1)  # 1次元配列に変換
-    all_preds.append(pred)
+        # 形状を統一
+        pred = pred.reshape(-1)  # 1次元配列に変換
+        all_preds.append(pred)
 
-    # ラベルも同様に処理
-    label = labels.cpu().numpy().reshape(-1)
-    all_labels.append(label)
+        # ラベルも同様に処理
+        label = labels.cpu().numpy().reshape(-1)
+        all_labels.append(label)
 
-    if train:  # 訓練モードのみ
-        loss.backward()
-        optimizer.step()
-        optimizer.zero_grad()
-        if lr_scheduler is not None:
-            lr_scheduler.step()
+        if train:  # 訓練モードのみ
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+            if lr_scheduler is not None:
+                lr_scheduler.step()
 
-    losses.append(loss.item())
+        losses.append(loss.item())
 
     # ループ終了後
     all_preds = np.concatenate(all_preds)
