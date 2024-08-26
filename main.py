@@ -291,7 +291,7 @@ def run(args: DictConfig):
         # NaNがないことを確認
         assert train[feature_cols].isna().sum().sum() == 0, "NaN values found in the final dataset"
 
-        print("Preprocessing completed. No NaN values in the final dataset.")
+        cprint("Preprocessing completed. No NaN values in the final dataset.", "yellow")
         print(f"all columns num: {len(train.columns)}, feature num: {len(train.columns) - 4}")
     
     

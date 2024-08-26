@@ -119,7 +119,6 @@ def read_data(path, cat_cols, num_cols, new_num_cols, err=1e-6):
     return df
 
 
-
 def feature_engeneering_for_cnn(df, err=1e-5):
     df_for_cnn = df.copy()
 
@@ -156,18 +155,38 @@ def feature_engeneering_for_cnn(df, err=1e-5):
 
     return df_for_cnn
 
+
 def prepare_data_for_training(df, cat_cols, logdir):
     # OneHotEncodingの適用
     encoder = CustomOneHotEncoder(cat_cols)
     encoded_cat_data = encoder.fit_transform(df[cat_cols])
 
-    new_cat_cols = encoded_cat_data.columns.to_list()
-    df[new_cat_cols] = encoded_cat_data
-    
+    # 新しいカテゴリカル列名のリストを作成
+    new_cat_cols = encoded_cat_data.columns.tolist()
+
+    # エンコードされたデータと元のデータを効率的に結合
+    df_encoded = pd.concat([df.drop(columns=cat_cols), encoded_cat_data], axis=1)
+
     # エンコーダーの保存
     encoder.save(os.path.join(logdir, 'onehot_encoder.joblib'))
     
-    return df, new_cat_cols
+    return df_encoded, new_cat_cols
+
+def prepare_data_for_inference(df, cat_cols, encoder_path):
+    # 保存されたエンコーダーのロード
+    encoder = CustomOneHotEncoder.load(os.path.join(encoder_path, 'onehot_encoder.joblib'))
+    
+    # OneHotEncodingの適用
+    encoded_cat_data = encoder.transform(df[cat_cols])
+    
+    # エンコードされたデータと元のデータ（数値データ）を効率的に結合
+    prepared_data = pd.concat([
+        df.drop(columns=cat_cols),  # 数値データ
+        encoded_cat_data        # エンコードされたカテゴリデータ
+    ], axis=1)
+    
+    return prepared_data
+
 
 def preprocess(df_train, df_test, feature_cols, cat_cols):
     
