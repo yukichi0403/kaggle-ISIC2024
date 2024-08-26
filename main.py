@@ -198,7 +198,8 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
 
 
     # スコアとAUCを計算
-    score, auc_score = custom_metric(all_labels, all_preds)
+    score = custom_metric(all_labels, all_preds)
+    auc_score = roc_auc_score(all_labels, all_preds) 
     
     if train:
         print(f"Epoch {epoch+1}/{args.epochs} | {mode} loss: {np.mean(losses):.3f} | {mode} score: {score:.3f} | {mode} auc: {auc_score:.3f} | lr: {current_lr:.7f}")
