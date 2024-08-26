@@ -277,9 +277,10 @@ def run(args: DictConfig):
             train = feature_engeneering_for_cnn(train)
         else:
             cat_cols, num_cols, new_num_cols, other_cols = get_feature_cols()
+
             # 数値型特徴量の欠損値を中央値で補完
             num_imputer = SimpleImputer(strategy='median')
-            train[num_cols] = num_imputer.fit_transform(train[num_cols])
+            train[num_cols + new_num_cols] = num_imputer.fit_transform(train[num_cols + new_num_cols])
             # カテゴリ型特徴量の欠損値を最頻値で補完
             cat_imputer = SimpleImputer(strategy='most_frequent')
             train[cat_cols] = cat_imputer.fit_transform(train[cat_cols])

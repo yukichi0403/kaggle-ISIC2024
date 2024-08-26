@@ -156,21 +156,18 @@ def feature_engeneering_for_cnn(df, err=1e-5):
 
     return df_for_cnn
 
-def prepare_data_for_training(df, cat_cols, num_cols, logdir):
+def prepare_data_for_training(df, cat_cols, logdir):
     # OneHotEncodingの適用
     encoder = CustomOneHotEncoder(cat_cols)
     encoded_cat_data = encoder.fit_transform(df[cat_cols])
-    
-    # 数値データの準備
-    numerical_data = df[num_cols]
-    
-    # エンコードされたカテゴリデータと数値データの結合
-    prepared_data = pd.concat([encoded_cat_data, numerical_data], axis=1)
+
+    new_cat_cols = encoded_cat_data.columns.to_list()
+    df[new_cat_cols] = encoded_cat_data
     
     # エンコーダーの保存
     encoder.save(os.path.join(logdir, 'onehot_encoder.joblib'))
     
-    return prepared_data, encoded_cat_data.columns.to_list()
+    return df, new_cat_cols
 
 def preprocess(df_train, df_test, feature_cols, cat_cols):
     
