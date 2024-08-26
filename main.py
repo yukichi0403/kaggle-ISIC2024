@@ -269,11 +269,11 @@ def run(args: DictConfig):
             num_imputer = SimpleImputer(strategy='median')
             train[num_cols + new_num_cols] = num_imputer.fit_transform(train[num_cols + new_num_cols])
             # カテゴリ型特徴量の欠損値を最頻値で補完
-            cat_imputer = SimpleImputer(strategy='most_frequent')
-            train[cat_cols] = cat_imputer.fit_transform(train[cat_cols])
+            # cat_imputer = SimpleImputer(strategy='most_frequent')
+            # train[cat_cols] = cat_imputer.fit_transform(train[cat_cols])
 
             train, new_cat_cols = prepare_data_for_training(train, cat_cols, logdir)
-            feature_cols = new_cat_cols + num_cols + new_num_cols + other_cols
+            feature_cols = num_cols + new_num_cols + other_cols #new_cat_cols + 
             train = train[['isic_id', 'target', 'fold', 'archive'] + feature_cols]
         
         # 最終的なNaNチェックと処理

@@ -3,6 +3,7 @@ import pandas as pd
 from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder
 import joblib
 import os
+import json
 
 class CustomOneHotEncoder:
     def __init__(self, categorical_columns):
@@ -15,7 +16,7 @@ class CustomOneHotEncoder:
             encoder = OneHotEncoder(sparse=False, handle_unknown='ignore')
             encoder.fit(df[[col]])
             self.encoders[col] = encoder
-            self.encoded_feature_names[col] = encoder.get_feature_names_out([col])
+            self.encoded_feature_names[col] = encoder.get_feature_names_out([col]).tolist()
 
     def transform(self, df):
         encoded_data = []
@@ -31,11 +32,25 @@ class CustomOneHotEncoder:
         return self.transform(df)
 
     def save(self, filename):
-        joblib.dump(self, filename)
+        data = {
+            'categorical_columns': self.categorical_columns,
+            'encoders': {col: {'categories': enc.categories_[0].tolist()} for col, enc in self.encoders.items()},
+            'encoded_feature_names': self.encoded_feature_names
+        }
+        with open(filename, 'w') as f:
+            json.dump(data, f)
 
     @classmethod
     def load(cls, filename):
-        return joblib.load(filename)
+        with open(filename, 'r') as f:
+            data = json.load(f)
+        encoder = cls(data['categorical_columns'])
+        encoder.encoded_feature_names = data['encoded_feature_names']
+        for col, enc_data in data['encoders'].items():
+            ohe = OneHotEncoder(sparse=False, handle_unknown='ignore')
+            ohe.categories_ = [np.array(enc_data['categories'])]
+            encoder.encoders[col] = ohe
+        return encoder
 
 
 def read_data(path, cat_cols, num_cols, new_num_cols, err=1e-6):
@@ -165,7 +180,10 @@ def prepare_data_for_training(df, cat_cols, logdir):
     new_cat_cols = encoded_cat_data.columns.tolist()
 
     # エンコードされたデータと元のデータを効率的に結合
-    df_encoded = pd.concat([df.drop(columns=cat_cols), encoded_cat_data], axis=1)
+    df_encoded = pd.concat([
+        df.drop(columns=cat_cols), 
+        encoded_cat_data
+    ], axis=1)
 
     # エンコーダーの保存
     encoder.save(os.path.join(logdir, 'onehot_encoder.joblib'))
