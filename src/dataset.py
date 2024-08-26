@@ -223,3 +223,24 @@ def get_transforms(image_size, augmentation_strength='strong'):
     ])
 
     return transforms_train, transforms_val
+
+
+def final_nan_check_and_handle(df, feature_cols):
+    # NaNが含まれているカラムを特定
+    nan_cols = df[feature_cols].columns[df[feature_cols].isna().any()].tolist()
+    
+    if nan_cols:
+        print(f"Warning: NaN values found in columns: {nan_cols}")
+        
+        for col in nan_cols:
+            if df[col].dtype in ['int64', 'float64']:
+                # 数値型カラムの場合、中央値で補完
+                df[col].fillna(df[col].median(), inplace=True)
+            else:
+                # カテゴリ型カラムの場合、最頻値で補完
+                df[col].fillna(df[col].mode()[0], inplace=True)
+    
+    # 最終確認
+    assert df[feature_cols].isna().sum().sum() == 0, "NaN values still present after final handling"
+    
+    return df

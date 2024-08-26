@@ -18,7 +18,7 @@ from sklearn.model_selection import GroupKFold, StratifiedKFold
 from sklearn.impute import SimpleImputer
 
 from src.utils import *
-from src.dataset import SkinCancerDataset, get_transforms
+from src.dataset import SkinCancerDataset, get_transforms, final_nan_check_and_handle
 from src.combo_loader import get_combo_loader
 from src.model import *
 from src.feature_engeneering import *
@@ -148,7 +148,6 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
             else:
                 inputs, labels = batch[0].to(args.device), batch[1].squeeze().to(args.device)
 
-
         if args.use_metadata_num:
             y_pred = model(inputs, metadata)
         elif args.use_metadata_num and args.aux_loss_features is not None:
@@ -161,7 +160,7 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
         if (isinstance(loss_func, torch.nn.BCEWithLogitsLoss) or isinstance(loss_func, torch.nn.BCELoss)):
             y_pred = y_pred.squeeze()
             labels = labels.float()  
-            
+        
         loss = loss_func(y_pred, labels)  # 修正: loss_funcを使用
 
         # 補助損失の計算
@@ -202,10 +201,6 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
     # ループ終了後
     all_preds = np.concatenate(all_preds)
     all_labels = np.concatenate(all_labels)
-
-    # スコアとAUCを計算
-    score, auc_score = custom_metric(all_labels, all_preds)
-
 
     # スコアとAUCを計算
     score = custom_metric(all_labels, all_preds)
@@ -276,8 +271,8 @@ def run(args: DictConfig):
             # 'age_approx' の変換と欠損値の処理
             train = feature_engeneering_for_cnn(train)
         else:
-            train = read_data(args.train_df_dir, cat_cols, num_cols, new_num_cols)
             cat_cols, num_cols, new_num_cols, other_cols = get_feature_cols()
+            train = read_data(args.train_df_dir, cat_cols, num_cols, new_num_cols)
 
             # 数値型特徴量の欠損値を中央値で補完
             num_imputer = SimpleImputer(strategy='median')
@@ -286,9 +281,17 @@ def run(args: DictConfig):
             cat_imputer = SimpleImputer(strategy='most_frequent')
             train[cat_cols] = cat_imputer.fit_transform(train[cat_cols])
 
-            train, new_cat_cols = prepare_data_for_training(train, cat_cols, num_cols + new_num_cols, logdir)
+            train, new_cat_cols = prepare_data_for_training(train, cat_cols, logdir)
             feature_cols = new_cat_cols + num_cols + new_num_cols + other_cols
             train = train[['isic_id', 'target', 'fold', 'archive'] + feature_cols]
+        
+        # 最終的なNaNチェックと処理
+        train = final_nan_check_and_handle(train, feature_cols)
+
+        # NaNがないことを確認
+        assert train[feature_cols].isna().sum().sum() == 0, "NaN values found in the final dataset"
+
+        print("Preprocessing completed. No NaN values in the final dataset.")
         print(f"all columns num: {len(train.columns)}, feature num: {len(train.columns) - 4}")
     
     
