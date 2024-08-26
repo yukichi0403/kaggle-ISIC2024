@@ -250,12 +250,11 @@ def run(args: DictConfig):
                 shutil.copy(encoder_path, local_dir)
                 print(f'Encoder saved to Local: {local_dir}')
 
-    
+    train = pd.read_csv(args.train_df_dir)
     if args.use_metadata_num:
         train['age_approx'] = train['age_approx'].replace('NA', np.nan).astype(float)
         train['age_approx'] = train['age_approx'].fillna(train['age_approx'].median())
         if args.use_metadata_num < 150:
-            train = pd.read_csv(args.train_df_dir)
             meta_cols = ['isic_id', 'target', 'fold', 'archive', 'age_approx','clin_size_long_diam_mm', 'tbp_lv_A', 'tbp_lv_Aext','tbp_lv_B', 'tbp_lv_Bext', 'tbp_lv_C', 'tbp_lv_Cext', 'tbp_lv_H',
                     'tbp_lv_Hext', 'tbp_lv_L', 'tbp_lv_Lext', 'tbp_lv_areaMM2','tbp_lv_area_perim_ratio', 'tbp_lv_color_std_mean', 'tbp_lv_deltaA',
                     'tbp_lv_deltaB', 'tbp_lv_deltaL', 'tbp_lv_deltaLB', 'tbp_lv_deltaLBnorm', 'tbp_lv_eccentricity', 'tbp_lv_minorAxisMM',
