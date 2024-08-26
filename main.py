@@ -276,6 +276,7 @@ def run(args: DictConfig):
             # 'age_approx' の変換と欠損値の処理
             train = feature_engeneering_for_cnn(train)
         else:
+            train = read_data(args.train_df_dir, cat_cols, num_cols, new_num_cols)
             cat_cols, num_cols, new_num_cols, other_cols = get_feature_cols()
 
             # 数値型特徴量の欠損値を中央値で補完
@@ -285,7 +286,6 @@ def run(args: DictConfig):
             cat_imputer = SimpleImputer(strategy='most_frequent')
             train[cat_cols] = cat_imputer.fit_transform(train[cat_cols])
 
-            train = read_data(args.train_df_dir, cat_cols, num_cols, new_num_cols)
             train, new_cat_cols = prepare_data_for_training(train, cat_cols, num_cols + new_num_cols, logdir)
             feature_cols = new_cat_cols + num_cols + new_num_cols + other_cols
             train = train[['isic_id', 'target', 'fold', 'archive'] + feature_cols]
