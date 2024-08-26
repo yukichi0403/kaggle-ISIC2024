@@ -28,7 +28,7 @@ class AttentionFusion(nn.Module):
 
 
 class MultiheadAttentionMetadataEncoder(nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_heads=8, num_layers=2, dropout=0.1):
+    def __init__(self, input_dim, hidden_dim, num_heads, num_layers, dropout=0.1):
         super(MultiheadAttentionMetadataEncoder, self).__init__()
         self.input_proj = nn.Linear(input_dim, hidden_dim)
         self.pos_encoder = nn.Sequential(
@@ -46,10 +46,15 @@ class MultiheadAttentionMetadataEncoder(nn.Module):
         self.final_norm = nn.LayerNorm(hidden_dim)
 
     def forward(self, x):
-        x = self.input_proj(x)
-        x = x.unsqueeze(1)  # Add sequence dimension
-        pos = self.pos_encoder(torch.arange(x.size(1), device=x.device).float())
-        x = x + pos.unsqueeze(0)
+        # x shape: (batch_size, input_dim)
+        x = self.input_proj(x)  # shape: (batch_size, hidden_dim)
+        x = x.unsqueeze(1)  # Add sequence dimension: (batch_size, 1, hidden_dim)
+        
+        # 位置エンコーディングを各バッチに適用
+        batch_size = x.size(0)
+        pos = self.pos_encoder(torch.arange(1, device=x.device).float().unsqueeze(0).expand(batch_size, -1))
+        pos = pos.unsqueeze(1)  # shape: (batch_size, 1, hidden_dim)
+        x = x + pos
         
         for layer, norm in zip(self.layers, self.norm_layers):
             residual = x
@@ -58,7 +63,7 @@ class MultiheadAttentionMetadataEncoder(nn.Module):
             x = self.dropout(x)
             x = residual + x
         
-        x = x.squeeze(1)  # Remove sequence dimension
+        x = x.squeeze(1)  # Remove sequence dimension: (batch_size, hidden_dim)
         x = self.output_proj(x)
         x = self.final_norm(x)
         return x
