@@ -247,15 +247,6 @@ def run(args: DictConfig):
     logdir = "/kaggle/working/" if not args.COLAB else hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
     print(f"logdir: {logdir}")
 
-    if args.use_metadata_num > 150 and args.local_dir:
-            # Localにコピー
-            local_dir = os.path.join(args.local_dir, f"{args.expname}_{args.ver}")
-            os.makedirs(local_dir, exist_ok=True)
-            encoder_path = os.path.join(logdir, f"onehot_encoder.joblib")
-            if os.path.exists(encoder_path):
-                shutil.copy(encoder_path, local_dir)
-                print(f'Encoder saved to Local: {local_dir}')
-
     train = pd.read_csv(args.train_df_dir)
     if args.use_metadata_num:
         train['age_approx'] = train['age_approx'].replace('NA', np.nan).astype(float)
@@ -293,7 +284,15 @@ def run(args: DictConfig):
 
         cprint("Preprocessing completed. No NaN values in the final dataset.", "yellow")
         print(f"all columns num: {len(train.columns)}, feature num: {len(train.columns) - 4}")
-    
+        
+        if args.use_metadata_num > 150 and args.local_dir:
+            # Localにコピー
+            local_dir = os.path.join(args.local_dir, f"{args.expname}_{args.ver}")
+            os.makedirs(local_dir, exist_ok=True)
+            encoder_path = os.path.join(logdir, f"onehot_encoder.joblib")
+            if os.path.exists(encoder_path):
+                shutil.copy(encoder_path, local_dir)
+                print(f'Encoder saved to Local: {local_dir}')
     
         
     loader_args = {"batch_size": args.batch_size, "num_workers": args.num_workers}
