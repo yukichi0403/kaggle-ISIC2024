@@ -193,12 +193,12 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
         losses.append(loss.item())
     
     # すべてのバッチの予測値とラベルを結合
-    all_preds = np.concatenate(all_preds, axis=0)
-    all_labels = np.concatenate(all_labels, axis=0)
+    all_preds = np.concatenate(all_preds, axis=0).ravel()
+    all_labels = np.concatenate(all_labels, axis=0).ravel()
 
 
     # スコアとAUCを計算
-    score, auc_score = comp_score(pd.DataFrame(all_labels), pd.DataFrame(all_preds))
+    score, auc_score = custom_metric(all_labels, all_preds)
     
     if train:
         print(f"Epoch {epoch+1}/{args.epochs} | {mode} loss: {np.mean(losses):.3f} | {mode} score: {score:.3f} | {mode} auc: {auc_score:.3f} | lr: {current_lr:.7f}")
