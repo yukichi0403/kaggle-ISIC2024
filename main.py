@@ -265,11 +265,6 @@ def run(args: DictConfig):
             cat_cols, num_cols, new_num_cols, other_cols = get_feature_cols()
             train = read_data(args.train_df_dir, cat_cols, num_cols, new_num_cols)
 
-            # 数値型特徴量の欠損値を中央値で補完
-            num_imputer = SimpleImputer(strategy='median')
-            train[num_cols + new_num_cols] = num_imputer.fit_transform(train[num_cols + new_num_cols])
-
-            train, new_cat_cols = prepare_data_for_training(train, cat_cols, logdir)
             feature_cols = num_cols + new_num_cols + other_cols #cat_colは外す 
             train = train[['isic_id', 'target', 'fold', 'archive'] + feature_cols]
         

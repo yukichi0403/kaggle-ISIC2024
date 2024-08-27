@@ -48,7 +48,7 @@ class SkinCancerDataset(Dataset):
         self.use_metadata_num = args.use_metadata_num
 
         if self.use_metadata_num:
-            self.metadata_scaler = RobustScaler()
+            self.metadata_scaler = StandardScaler()
             if split != "test":
                 self.metadata = self.metadata_scaler.fit_transform(df.iloc[:, 4:4+self.use_metadata_num].values.astype(np.float32))
             else:
@@ -241,5 +241,5 @@ def preprocess_numerical_cols(X):
     
     # まだNaNが残っている場合は0で埋める
     X_processed = X_processed.fillna(0)
-    
+
     return X_processed[original_columns]
