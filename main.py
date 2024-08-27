@@ -18,7 +18,7 @@ from sklearn.model_selection import GroupKFold, StratifiedKFold
 from sklearn.impute import SimpleImputer
 
 from src.utils import *
-from src.dataset import SkinCancerDataset, get_transforms, final_nan_check_and_handle
+from src.dataset import SkinCancerDataset, get_transforms, preprocess_numerical_cols
 from src.combo_loader import get_combo_loader
 from src.model import *
 from src.feature_engeneering import *
@@ -268,16 +268,13 @@ def run(args: DictConfig):
             # 数値型特徴量の欠損値を中央値で補完
             num_imputer = SimpleImputer(strategy='median')
             train[num_cols + new_num_cols] = num_imputer.fit_transform(train[num_cols + new_num_cols])
-            # カテゴリ型特徴量の欠損値を最頻値で補完
-            # cat_imputer = SimpleImputer(strategy='most_frequent')
-            # train[cat_cols] = cat_imputer.fit_transform(train[cat_cols])
 
             train, new_cat_cols = prepare_data_for_training(train, cat_cols, logdir)
-            feature_cols = num_cols + new_num_cols + other_cols #new_cat_cols + 
+            feature_cols = num_cols + new_num_cols + other_cols #cat_colは外す 
             train = train[['isic_id', 'target', 'fold', 'archive'] + feature_cols]
         
         # 最終的なNaNチェックと処理
-        train = final_nan_check_and_handle(train, feature_cols)
+        train = preprocess_numerical_cols(train)
 
         # NaNがないことを確認
         assert train[feature_cols].isna().sum().sum() == 0, "NaN values found in the final dataset"
