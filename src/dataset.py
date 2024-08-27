@@ -11,7 +11,8 @@ from io import BytesIO
 import pandas as pd
 import cv2
 import random
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, RobustScaler
+from sklearn.impute import SimpleImputer
 from albumentations.pytorch import ToTensorV2
 
 
@@ -44,11 +45,10 @@ class SkinCancerDataset(Dataset):
         self.remove_hair_thresh = remove_hair_thresh
         self.df = df
         self.sampling_rate = args.sampling_rate
-        self.use_JPEG = args.use_JPEG
         self.use_metadata_num = args.use_metadata_num
 
         if self.use_metadata_num:
-            self.metadata_scaler = StandardScaler()
+            self.metadata_scaler = RobustScaler()
             if split != "test":
                 self.metadata = self.metadata_scaler.fit_transform(df.iloc[:, 4:4+self.use_metadata_num].values.astype(np.float32))
             else:
@@ -67,12 +67,9 @@ class SkinCancerDataset(Dataset):
 
         self.hdf_dir = "train-image.hdf5"
         self.hdf_dir_archive = f"image_384sq.hdf5"
-        self.image_dir = args.image_dir
-        self.archive_image_dir = args.archive_image_dir
-        if split in ["train", "val"]:
-            if not self.use_JPEG:
-                self.fp_hdf = h5py.File(os.path.join(args.data_dir, self.hdf_dir), mode="r")
-                self.fp_hdf_archive = h5py.File(os.path.join(args.data_dir_archive, self.hdf_dir_archive), mode="r")
+        if split in ["train", "val"]:            
+            self.fp_hdf = h5py.File(os.path.join(args.data_dir, self.hdf_dir), mode="r")
+            self.fp_hdf_archive = h5py.File(os.path.join(args.data_dir_archive, self.hdf_dir_archive), mode="r")
             self.targets = self.df['target'].values
         else:
             self.fp_hdf = h5py.File(os.path.join(args.data_dir, "test-image.hdf5"), mode="r")
@@ -104,16 +101,10 @@ class SkinCancerDataset(Dataset):
         isic_id = df.iloc[i]['isic_id']
         if self.split != "test":archive = df.iloc[i]['archive']
             
-        if self.use_JPEG:
-            if archive:img_path = os.path.join(self.archive_image_dir, isic_id+".jpg")
-            else:img_path = os.path.join(self.image_dir, isic_id+".jpg")
-            X = cv2.imread(img_path)
-            X = cv2.cvtColor(X, cv2.COLOR_BGR2RGB)
-        else: #testの場合は全てhdf
-            if self.split != "test" and archive:
-                X = np.array(Image.open(BytesIO(self.fp_hdf_archive[isic_id][()])))
-            else:
-                X = np.array(Image.open(BytesIO(self.fp_hdf[isic_id][()])))
+        if self.split != "test" and archive:
+            X = np.array(Image.open(BytesIO(self.fp_hdf_archive[isic_id][()])))
+        else:
+            X = np.array(Image.open(BytesIO(self.fp_hdf[isic_id][()])))
         
 
         if self.remove_hair_thresh > 0:            
@@ -225,22 +216,30 @@ def get_transforms(image_size, augmentation_strength='strong'):
     return transforms_train, transforms_val
 
 
-def final_nan_check_and_handle(df, feature_cols):
-    # NaNが含まれているカラムを特定
-    nan_cols = df[feature_cols].columns[df[feature_cols].isna().any()].tolist()
+def preprocess_numerical_cols(X):
+    # 元のデータフレームの列名を保存
+    original_columns = X.columns
+    X = X.replace([np.inf, -np.inf], np.nan)
     
-    if nan_cols:
-        print(f"Warning: NaN values found in columns: {nan_cols}")
-        
-        for col in nan_cols:
-            if df[col].dtype in ['int64', 'float64']:
-                # 数値型カラムの場合、中央値で補完
-                df[col].fillna(df[col].median(), inplace=True)
-            else:
-                # カテゴリ型カラムの場合、最頻値で補完
-                df[col].fillna(df[col].mode()[0], inplace=True)
+    # 全てNaNの列を0で埋める
+    all_nan_columns = X.columns[X.isna().all()].tolist()
+    X[all_nan_columns] = 0
     
-    # 最終確認
-    assert df[feature_cols].isna().sum().sum() == 0, "NaN values still present after final handling"
+    # 数値列のみに対してSimpleImputerを適用
+    num_columns = X.select_dtypes(include=[np.number]).columns
+    imputer = SimpleImputer(strategy='median')
+    try:
+        X_imputed = pd.DataFrame(imputer.fit_transform(X[num_columns]), columns=num_columns, index=X.index)
+    except ValueError as e:
+        cprint(f"Error during imputation: {e}", "red")
+        print("Falling back to filling NaN with 0 for all numeric columns")
+        X_imputed = X[num_columns].fillna(0)
     
-    return df
+    # 非数値列がある場合は、それらを保持
+    non_num_columns = [col for col in original_columns if col not in num_columns]
+    X_processed = pd.concat([X_imputed, X[non_num_columns]], axis=1)
+    
+    # まだNaNが残っている場合は0で埋める
+    X_processed = X_processed.fillna(0)
+    
+    return X_processed[original_columns]
