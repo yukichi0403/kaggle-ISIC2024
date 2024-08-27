@@ -28,33 +28,22 @@ class AttentionFusion(nn.Module):
 
 
 class MultiheadAttentionMetadataEncoder(nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_heads, num_layers, dropout=0.1):
+    def __init__(self, input_dim, hidden_dim, out_dim, num_heads, num_layers, dropout=0.1):
         super(MultiheadAttentionMetadataEncoder, self).__init__()
         self.input_proj = nn.Linear(input_dim, hidden_dim)
-        self.pos_encoder = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.GELU(),
-            nn.Linear(hidden_dim, hidden_dim)
-        )
         self.layers = nn.ModuleList([
             nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=num_heads, dropout=dropout, batch_first=True)
             for _ in range(num_layers)
         ])
         self.norm_layers = nn.ModuleList([nn.LayerNorm(hidden_dim) for _ in range(num_layers)])
         self.dropout = nn.Dropout(dropout)
-        self.output_proj = nn.Linear(hidden_dim, hidden_dim)
-        self.final_norm = nn.LayerNorm(hidden_dim)
+        self.output_proj = nn.Linear(hidden_dim, out_dim)
+        self.final_norm = nn.LayerNorm(out_dim)
 
     def forward(self, x):
         # x shape: (batch_size, input_dim)
         x = self.input_proj(x)  # shape: (batch_size, hidden_dim)
         x = x.unsqueeze(1)  # Add sequence dimension: (batch_size, 1, hidden_dim)
-        
-        # 位置エンコーディングを各バッチに適用
-        batch_size = x.size(0)
-        pos = self.pos_encoder(torch.arange(1, device=x.device).float().unsqueeze(0).expand(batch_size, -1))
-        pos = pos.unsqueeze(1)  # shape: (batch_size, 1, hidden_dim)
-        x = x + pos
         
         for layer, norm in zip(self.layers, self.norm_layers):
             residual = x
@@ -380,8 +369,8 @@ class CustomSwinModel(nn.Module):
                     nn.SiLU(),
                 )
             elif args.metadata_head_type == "attention":
-                self.metadata_encoder = MultiheadAttentionMetadataEncoder(args.use_metadata_num, args.metadata_dim, 
-                                                                          num_heads=8, num_layers=2, dropout=0.1)
+                self.metadata_encoder = MultiheadAttentionMetadataEncoder(args.use_metadata_num, args.metadata_dim, self.encoder.num_features,
+                                                                          num_heads=8, num_layers=2, dropout=0.3)
             
             self.fusion = args.fusion_method  # New argument for fusion method
             if self.fusion == 'concat':
