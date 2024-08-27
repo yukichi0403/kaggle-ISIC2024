@@ -187,35 +187,55 @@ class CustomModelEva(nn.Module):
 
         self.use_metadata = args.use_metadata_num is not None and args.use_metadata_num > 0
         if self.use_metadata:
-            self.linear_main = nn.Linear(self.encoder.num_features * 2, args.num_classes)
-            self.block_1 = nn.Sequential(
-                nn.Linear(args.use_metadata_num, self.encoder.num_features * 4),
-                nn.BatchNorm1d(self.encoder.num_features * 4),
-                nn.SiLU(),
-                nn.Dropout(args.dropout),
-            )
-            self.block_2 = nn.Sequential(
-                nn.Linear(self.encoder.num_features * 4, self.encoder.num_features * 2),
-                nn.BatchNorm1d(self.encoder.num_features * 2),
-                nn.SiLU(),
-                nn.Dropout(args.dropout),
-            )
-            self.block_3 = nn.Sequential(
-                nn.Linear(self.encoder.num_features * 2, self.encoder.num_features),
-                nn.BatchNorm1d(self.encoder.num_features),
-                nn.SiLU(),
-            )
+            if args.metadata_head_type == "linear":
+                self.metadata_encoder = nn.Sequential(
+                    nn.Linear(args.use_metadata_num, args.metadata_dim),
+                    nn.BatchNorm1d(args.metadata_dim),
+                    nn.SiLU(),
+                    nn.Dropout(0.3),
+                    nn.Linear(args.metadata_dim, self.encoder.num_features),
+                    nn.BatchNorm1d(self.encoder.num_features),
+                    nn.SiLU(),
+                )
+            elif args.metadata_head_type == "attention":
+                self.metadata_encoder = MultiheadAttentionMetadataEncoder(args.use_metadata_num, args.metadata_dim, self.encoder.num_features,
+                                                                          num_heads=8, num_layers=1, dropout=0.3)
+            
+            self.fusion = args.fusion_method  # New argument for fusion method
+            if self.fusion == 'concat':
+                self.linear_main = nn.Linear(self.encoder.num_features * 2, args.num_classes)
+            elif self.fusion == 'gated':
+                self.gate = nn.Sequential(
+                    nn.Linear(self.encoder.num_features * 2, self.encoder.num_features),
+                    nn.Sigmoid()
+                )
+                self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+            elif self.fusion == 'attention':
+                self.attention_fusion = AttentionFusion(dim=self.encoder.num_features)
+                self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+            else:
+                self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
         else:
             self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
 
     def forward(self, images, metadata=None):
-        out = self.encoder(images)
+        image_features = self.encoder(images)
 
         if self.use_metadata and metadata is not None:
-            meta_out = self.block_1(metadata)
-            meta_out = self.block_2(meta_out)
-            meta_out = self.block_3(meta_out)
-            out = torch.cat([out, meta_out], dim=1)
+            metadata_features = self.metadata_encoder(metadata)
+            
+            if self.fusion == 'concat':
+                fused_features = torch.cat([image_features, metadata_features], dim=1)
+            elif self.fusion == 'gated':
+                concat_features = torch.cat([image_features, metadata_features], dim=1)
+                gate = self.gate(concat_features)
+                fused_features = image_features * gate
+            elif self.fusion == 'attention':
+                fused_features = self.attention_fusion(image_features, metadata_features)
+            else:
+                fused_features = image_features
+        else:
+            fused_features = image_features
 
         if self.training:
             main_out = 0
