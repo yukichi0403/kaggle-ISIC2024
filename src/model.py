@@ -280,8 +280,8 @@ class CustomConvEdgeNextModel(nn.Module):
                     nn.SiLU(),
                 )
             elif args.metadata_head_type == "attention":
-                self.metadata_encoder = MultiheadAttentionMetadataEncoder(args.use_metadata_num, args.metadata_dim, 
-                                                                          num_heads=8, num_layers=2, dropout=0.1)
+                self.metadata_encoder = MultiheadAttentionMetadataEncoder(args.use_metadata_num, args.metadata_dim, self.encoder.num_features,
+                                                                          num_heads=8, num_layers=1, dropout=0.3)
             
             self.fusion = args.fusion_method  # New argument for fusion method
             if self.fusion == 'concat':
@@ -370,7 +370,7 @@ class CustomSwinModel(nn.Module):
                 )
             elif args.metadata_head_type == "attention":
                 self.metadata_encoder = MultiheadAttentionMetadataEncoder(args.use_metadata_num, args.metadata_dim, self.encoder.num_features,
-                                                                          num_heads=8, num_layers=2, dropout=0.3)
+                                                                          num_heads=8, num_layers=1, dropout=0.3)
             
             self.fusion = args.fusion_method  # New argument for fusion method
             if self.fusion == 'concat':
