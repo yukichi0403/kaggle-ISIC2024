@@ -77,6 +77,8 @@ def load_model(args, fold):
         model = CustomCoatnetModel(args, training=True).to(args.device)
     elif "resnet" in args.model_name:
         model = CustomModelResNet(args, training=True).to(args.device)
+    elif "resnext" in args.model_name:
+        model = CustomResnextModel(args, training=True).to(args.device)
     else:
         raise ValueError(f"Model {args.model_name} not supported")
 
@@ -234,8 +236,6 @@ def configure_optimizers(model, args):
     else:
         metadata_params = []
         optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    
-
     
     return optimizer
 

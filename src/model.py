@@ -599,3 +599,193 @@ class CustomCoatnetModel(nn.Module):
             main_out = self.linear_main(out)
 
         return main_out
+
+
+    #######################
+    #### Resnext
+    #######################
+    class CustomResnextModel(nn.Module):
+        def __init__(self, args, training: bool = True):
+            super(CustomResnextModel, self).__init__()
+            self.aux_loss_features = args.aux_loss_features
+            self.aux_loss_feature_outnum = args.aux_loss_feature_outnum
+
+            self.training = training
+            self.encoder = timm.create_model(args.model_name, pretrained=training,
+                                            drop_path_rate=args.drop_path_rate)
+            self.features = nn.Sequential(*list(self.encoder.children())[:-1])
+            self.GAP = SelectAdaptivePool2d(pool_type='avg', input_fmt='NCHW', flatten=True)
+            self.dropout_main = nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)])
+            
+            self.use_metadata = args.use_metadata_num is not None and args.use_metadata_num > 0
+            if self.use_metadata:
+                if args.metadata_head_type == "linear":
+                    self.metadata_encoder = nn.Sequential(
+                        nn.Linear(args.use_metadata_num, args.metadata_dim),
+                        nn.BatchNorm1d(args.metadata_dim),
+                        nn.SiLU(),
+                        nn.Dropout(0.3),
+                        nn.Linear(args.metadata_dim, self.encoder.num_features),
+                        nn.BatchNorm1d(self.encoder.num_features),
+                        nn.SiLU(),
+                    )
+                elif args.metadata_head_type == "attention":
+                    self.metadata_encoder = MultiheadAttentionMetadataEncoder(args.use_metadata_num, args.metadata_dim, self.encoder.num_features,
+                                                                              num_heads=8, num_layers=1, dropout=0.3)
+                
+                self.fusion = args.fusion_method  # New argument for fusion method
+                if self.fusion == 'concat':
+                    self.linear_main = nn.Linear(self.encoder.num_features * 2, args.num_classes)
+                elif self.fusion == 'gated':
+                    self.gate = nn.Sequential(
+                        nn.Linear(self.encoder.num_features * 2, self.encoder.num_features),
+                        nn.Sigmoid()
+                    )
+                    self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+                elif self.fusion == 'attention':
+                    self.attention_fusion = AttentionFusion(dim=self.encoder.num_features)
+                    self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+                else:
+                    self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+            else:
+                self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+
+            if self.aux_loss_features is not None:
+                self.aux_dropout = nn.ModuleList([nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)]) for _ in self.aux_loss_features])
+                self.aux_linear = nn.ModuleList([nn.Linear(self.encoder.num_features, outnum) for outnum in self.aux_loss_feature_outnum])
+
+        def forward(self, images, metadata=None):
+            image_features = self.features(images)
+            image_features = self.GAP(image_features)
+
+            if self.use_metadata and metadata is not None:
+                metadata_features = self.metadata_encoder(metadata)
+                
+                if self.fusion == 'concat':
+                    fused_features = torch.cat([image_features, metadata_features], dim=1)
+                elif self.fusion == 'gated':
+                    concat_features = torch.cat([image_features, metadata_features], dim=1)
+                    gate = self.gate(concat_features)
+                    fused_features = image_features * gate
+                elif self.fusion == 'attention':
+                    fused_features = self.attention_fusion(image_features, metadata_features)
+                else:
+                    fused_features = image_features
+            else:
+                fused_features = image_features
+
+            if self.training:
+                main_out = 0
+                for i in range(len(self.dropout_main)):
+                    main_out += self.linear_main(self.dropout_main[i](fused_features))
+                main_out = main_out / len(self.dropout_main)
+                
+
+                aux_outs = []
+                if self.aux_loss_features is not None:
+                    for aux_dropout, aux_linear in zip(self.aux_dropout, self.aux_linear):
+                        out_aux = 0
+                        for i in range(len(aux_dropout)):
+                            out_aux += aux_linear(aux_dropout[i](fused_features))
+                        out_aux = out_aux / len(aux_dropout)
+                        aux_outs.append(out_aux)
+                    return main_out, aux_outs
+            else:
+                main_out = self.linear_main(fused_features)
+
+            return main_out    
+        
+        
+#######################
+#### Resnext
+#######################
+class CustomResnextModel(nn.Module):
+    def __init__(self, args, training: bool = True):
+        super(CustomResnextModel, self).__init__()
+        self.aux_loss_features = args.aux_loss_features
+        self.aux_loss_feature_outnum = args.aux_loss_feature_outnum
+
+        self.training = training
+        self.encoder = timm.create_model(args.model_name, pretrained=training,
+                                        drop_path_rate=args.drop_path_rate)
+        self.features = nn.Sequential(*list(self.encoder.children())[:-1])
+        self.GAP = SelectAdaptivePool2d(pool_type='avg', input_fmt='NCHW', flatten=True)
+        self.dropout_main = nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)])
+        
+        self.use_metadata = args.use_metadata_num is not None and args.use_metadata_num > 0
+        if self.use_metadata:
+            if args.metadata_head_type == "linear":
+                self.metadata_encoder = nn.Sequential(
+                    nn.Linear(args.use_metadata_num, args.metadata_dim),
+                    nn.BatchNorm1d(args.metadata_dim),
+                    nn.SiLU(),
+                    nn.Dropout(0.3),
+                    nn.Linear(args.metadata_dim, self.encoder.num_features),
+                    nn.BatchNorm1d(self.encoder.num_features),
+                    nn.SiLU(),
+                )
+            elif args.metadata_head_type == "attention":
+                self.metadata_encoder = MultiheadAttentionMetadataEncoder(args.use_metadata_num, args.metadata_dim, self.encoder.num_features,
+                                                                            num_heads=8, num_layers=1, dropout=0.3)
+            
+            self.fusion = args.fusion_method  # New argument for fusion method
+            if self.fusion == 'concat':
+                self.linear_main = nn.Linear(self.encoder.num_features * 2, args.num_classes)
+            elif self.fusion == 'gated':
+                self.gate = nn.Sequential(
+                    nn.Linear(self.encoder.num_features * 2, self.encoder.num_features),
+                    nn.Sigmoid()
+                )
+                self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+            elif self.fusion == 'attention':
+                self.attention_fusion = AttentionFusion(dim=self.encoder.num_features)
+                self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+            else:
+                self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+        else:
+            self.linear_main = nn.Linear(self.encoder.num_features, args.num_classes)
+
+        if self.aux_loss_features is not None:
+            self.aux_dropout = nn.ModuleList([nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)]) for _ in self.aux_loss_features])
+            self.aux_linear = nn.ModuleList([nn.Linear(self.encoder.num_features, outnum) for outnum in self.aux_loss_feature_outnum])
+
+    def forward(self, images, metadata=None):
+        image_features = self.features(images)
+        image_features = self.GAP(image_features)
+
+        if self.use_metadata and metadata is not None:
+            metadata_features = self.metadata_encoder(metadata)
+            
+            if self.fusion == 'concat':
+                fused_features = torch.cat([image_features, metadata_features], dim=1)
+            elif self.fusion == 'gated':
+                concat_features = torch.cat([image_features, metadata_features], dim=1)
+                gate = self.gate(concat_features)
+                fused_features = image_features * gate
+            elif self.fusion == 'attention':
+                fused_features = self.attention_fusion(image_features, metadata_features)
+            else:
+                fused_features = image_features
+        else:
+            fused_features = image_features
+
+        if self.training:
+            main_out = 0
+            for i in range(len(self.dropout_main)):
+                main_out += self.linear_main(self.dropout_main[i](fused_features))
+            main_out = main_out / len(self.dropout_main)
+            
+
+            aux_outs = []
+            if self.aux_loss_features is not None:
+                for aux_dropout, aux_linear in zip(self.aux_dropout, self.aux_linear):
+                    out_aux = 0
+                    for i in range(len(aux_dropout)):
+                        out_aux += aux_linear(aux_dropout[i](fused_features))
+                    out_aux = out_aux / len(aux_dropout)
+                    aux_outs.append(out_aux)
+                return main_out, aux_outs
+        else:
+            main_out = self.linear_main(fused_features)
+
+        return main_out
