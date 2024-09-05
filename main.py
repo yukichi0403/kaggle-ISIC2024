@@ -71,8 +71,6 @@ def load_model(args, fold):
         model = CustomConvEdgeNextModel(args, training=True).to(args.device)
     elif "eva" in args.model_name:
         model = CustomModelEva(args, training=True).to(args.device)
-    elif "resnext" in args.model_name:
-        model = CustomModelResNet(args, training=True).to(args.device)
     elif "coatnet" in args.model_name:
         model = CustomCoatnetModel(args, training=True).to(args.device)
     elif "resnet" in args.model_name:
