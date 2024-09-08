@@ -366,22 +366,20 @@ class CustomConvEdgeNextModel(nn.Module):
                 fused_features = image_features
         else:
             fused_features = image_features
-        if self.training:
-            main_out = 0
-            for i in range(len(self.dropout_main)):
-                main_out += self.linear_main(self.dropout_main[i](fused_features))
-            main_out = main_out / len(self.dropout_main)
 
-            if self.aux_loss_ratio is not None:
-                out_aux = 0
-                for i in range(len(self.dropout_aux)):
-                    out_aux += self.linear_aux(self.dropout_aux[i](fused_features))
-                out_aux = out_aux / len(self.dropout_aux)
-                return main_out, out_aux     
+        main_out = 0
+        for i in range(len(self.dropout_main)):
+            main_out += self.linear_main(self.dropout_main[i](fused_features))
+        main_out = main_out / len(self.dropout_main)
+
+        if self.aux_loss_ratio is not None:
+            out_aux = 0
+            for i in range(len(self.dropout_aux)):
+                out_aux += self.linear_aux(self.dropout_aux[i](fused_features))
+            out_aux = out_aux / len(self.dropout_aux)
+            return main_out, out_aux     
         else:
-            main_out = self.linear_main(fused_features)
-        
-        return main_out
+            return main_out
     
 
 

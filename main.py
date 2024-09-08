@@ -172,7 +172,6 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
                     loss += nn.MSELoss()(aux_outs.squeeze(), aux_labels) * aux_weight
                 else:  # 分類タスクの場合
                     aux_labels = aux_features[aux_feature].to(args.device)
-                    print(aux_outs.shape)
                     loss += nn.BCEWithLogitsLoss()(aux_outs.squeeze(), aux_labels.float()) * aux_weight
 
         # 予測値とラベルを保存
