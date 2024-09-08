@@ -161,26 +161,20 @@ class CustomModel(nn.Module):
                 fused_features = image_features
         else:
             fused_features = image_features
-        
-        if self.training:
-            main_out = 0
-            for i in range(len(self.dropout_main)):
-                main_out += self.linear_main(self.dropout_main[i](fused_features))
-            main_out = main_out / len(self.dropout_main)
 
-            aux_outs = []
-            if self.aux_loss_features is not None:
-                for aux_dropout, aux_linear in zip(self.aux_dropout, self.aux_linear):
-                    out_aux = 0
-                    for i in range(len(aux_dropout)):
-                        out_aux += aux_linear(aux_dropout[i](fused_features))
-                    out_aux = out_aux / len(aux_dropout)
-                    aux_outs.append(out_aux)
-                return main_out, aux_outs
+        main_out = 0
+        for i in range(len(self.dropout_main)):
+            main_out += self.linear_main(self.dropout_main[i](fused_features))
+        main_out = main_out / len(self.dropout_main)
+
+        if self.aux_loss_ratio is not None:
+            out_aux = 0
+            for i in range(len(self.dropout_aux)):
+                out_aux += self.linear_aux(self.dropout_aux[i](fused_features))
+            out_aux = out_aux / len(self.dropout_aux)
+            return main_out, out_aux     
         else:
-            main_out = self.linear_main(fused_features)
-
-        return main_out
+            return main_out
     
 
 
@@ -262,25 +256,19 @@ class CustomModelEva(nn.Module):
         else:
             fused_features = image_features
 
-        if self.training:
-            main_out = 0
-            for i in range(len(self.dropout_main)):
-                main_out += self.linear_main(self.dropout_main[i](fused_features))
-            main_out = main_out / len(self.dropout_main)
+        main_out = 0
+        for i in range(len(self.dropout_main)):
+            main_out += self.linear_main(self.dropout_main[i](fused_features))
+        main_out = main_out / len(self.dropout_main)
 
-            aux_outs = []
-            if self.aux_loss_features is not None:
-                for aux_dropout, aux_linear in zip(self.aux_dropout, self.aux_linear):
-                    out_aux = 0
-                    for i in range(len(aux_dropout)):
-                        out_aux += aux_linear(aux_dropout[i](fused_features))
-                    out_aux = out_aux / len(aux_dropout)
-                    aux_outs.append(out_aux)
-                return main_out, aux_outs
+        if self.aux_loss_ratio is not None:
+            out_aux = 0
+            for i in range(len(self.dropout_aux)):
+                out_aux += self.linear_aux(self.dropout_aux[i](fused_features))
+            out_aux = out_aux / len(self.dropout_aux)
+            return main_out, out_aux     
         else:
-            main_out = self.linear_main(fused_features)
-
-        return main_out
+            return main_out
 
 
 
@@ -456,25 +444,19 @@ class CustomSwinModel(nn.Module):
         else:
             fused_features = image_features
 
-        if self.training:
-            main_out = 0
-            for i in range(len(self.dropout_main)):
-                main_out += self.linear_main(self.dropout_main[i](fused_features))
-            main_out = main_out / len(self.dropout_main)
+        main_out = 0
+        for i in range(len(self.dropout_main)):
+            main_out += self.linear_main(self.dropout_main[i](fused_features))
+        main_out = main_out / len(self.dropout_main)
 
-            aux_outs = []
-            if self.aux_loss_features is not None:
-                for aux_dropout, aux_linear in zip(self.aux_dropout, self.aux_linear):
-                    out_aux = 0
-                    for i in range(len(aux_dropout)):
-                        out_aux += aux_linear(aux_dropout[i](fused_features))
-                    out_aux = out_aux / len(aux_dropout)
-                    aux_outs.append(out_aux)
-                return main_out, aux_outs
+        if self.aux_loss_ratio is not None:
+            out_aux = 0
+            for i in range(len(self.dropout_aux)):
+                out_aux += self.linear_aux(self.dropout_aux[i](fused_features))
+            out_aux = out_aux / len(self.dropout_aux)
+            return main_out, out_aux     
         else:
-            main_out = self.linear_main(fused_features)
-
-        return main_out
+            return main_out
     
 
 
