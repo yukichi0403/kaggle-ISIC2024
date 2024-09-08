@@ -241,6 +241,8 @@ def configure_optimizers(model, args):
 @hydra.main(version_base=None, config_path="configs", config_name="config_finetuning")
 def run(args: DictConfig): 
     print(args)
+    if args.early_stopping_rounds:
+        cprint(f"With Earlystopping　round: {args.early_stopping_rounds}.", "cyan")
     set_seed(args.seed)
 
     logdir = "/kaggle/working/" if not args.COLAB else hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
@@ -367,32 +369,32 @@ def run(args: DictConfig):
                     "epoch": epoch
                 })
             
-        if args.early_stopping_rounds:
-            if np.mean(val_score) > max_val_score:
-                cprint("New best.", "cyan")
+            if args.early_stopping_rounds > 0:
+                if val_score > max_val_score:
+                    cprint("New best.", "cyan")
+                    model_path = os.path.join(logdir, f"model_best_fold{fold+1}.pt")
+                    # モデルの状態とその他の情報を保存
+                    torch.save({
+                        'epoch': epoch,
+                        'model_state_dict': model.state_dict(),
+                        'val_score': val_score,
+                        'expname': args.expname,
+                    }, model_path)
+                    max_val_score = np.mean(val_score)
+                    no_improve_epochs = 0
+                else:
+                    no_improve_epochs += 1
+                    if no_improve_epochs > args.early_stopping_rounds:
+                        cprint(f"Early stopping. No improvement for {no_improve_epochs} epochs.", "cyan")
+                        break
+            else:
                 model_path = os.path.join(logdir, f"model_best_fold{fold+1}.pt")
-                # モデルの状態とその他の情報を保存
                 torch.save({
                     'epoch': epoch,
                     'model_state_dict': model.state_dict(),
                     'val_score': val_score,
                     'expname': args.expname,
                 }, model_path)
-                max_val_score = np.mean(val_score)
-                no_improve_epochs = 0
-            else:
-                no_improve_epochs += 1
-                if no_improve_epochs > args.early_stopping_rounds:
-                    cprint(f"Early stopping. No improvement for {no_improve_epochs} epochs.", "cyan")
-                    break
-        else:
-            model_path = os.path.join(logdir, f"model_best_fold{fold+1}.pt")
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': model.state_dict(),
-                'val_score': val_score,
-                'expname': args.expname,
-            }, model_path)
 
         if args.local_dir:
             # Localにコピー
