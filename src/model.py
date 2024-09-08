@@ -310,7 +310,7 @@ class CustomConvEdgeNextModel(nn.Module):
 
         if self.aux_loss_ratio is not None:
             self.dropout_aux = nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)])  # Dropout augmentation
-            self.linear_aux = nn.Linear(self.encoder.num_features, 4)
+            self.linear_aux = nn.Linear(self.encoder.num_features, args.aux_loss_feature_outnum[0])
         
         self.use_metadata = args.use_metadata_num is not None and args.use_metadata_num > 0
         if self.use_metadata:

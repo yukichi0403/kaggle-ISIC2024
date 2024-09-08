@@ -139,12 +139,12 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
     for batch in tqdm(loader, desc=mode):
         if args.use_metadata_num:
             if args.aux_loss_features is not None:
-                inputs, labels, aux_features, metadata = batch[0].to(args.device), batch[1].squeeze().to(args.device), batch[2].to(args.device), batch[3].to(args.device)
+                inputs, labels, aux_features, metadata = batch[0].to(args.device), batch[1].squeeze().to(args.device), batch[2], batch[3].to(args.device)
             else:
                 inputs, labels, metadata = batch[0].to(args.device), batch[1].squeeze().to(args.device), batch[2].to(args.device)
         else:
             if args.aux_loss_features is not None:
-                inputs, labels, aux_features = batch[0].to(args.device), batch[1].squeeze().to(args.device), batch[2].to(args.device)
+                inputs, labels, aux_features = batch[0].to(args.device), batch[1].squeeze().to(args.device), batch[2]
             else:
                 inputs, labels = batch[0].to(args.device), batch[1].squeeze().to(args.device)
 
@@ -154,6 +154,7 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
             y_pred, aux_outs = model(inputs, metadata)
         elif args.aux_loss_features is not None:
             y_pred, aux_outs = model(inputs)
+
         else:
             y_pred = model(inputs)
 
@@ -165,13 +166,14 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
 
         # 補助損失の計算
         if args.aux_loss_ratio and train:
-            for i, (aux_out, aux_feature, aux_weight) in enumerate(zip(aux_outs, args.aux_loss_features, args.aux_loss_ratio)):
+            for i, (aux_feature, aux_weight) in enumerate(zip(args.aux_loss_features, args.aux_loss_ratio)):
                 if args.aux_task_reg[i]:  # 回帰タスクの場合
                     aux_labels = aux_features[aux_feature].to(args.device).float()
-                    loss += nn.MSELoss()(aux_out.squeeze(), aux_labels) * aux_weight
+                    loss += nn.MSELoss()(aux_outs.squeeze(), aux_labels) * aux_weight
                 else:  # 分類タスクの場合
-                    aux_labels = aux_features[aux_feature].to(args.device).long()
-                    loss += nn.CrossEntropyLoss()(aux_out, aux_labels.long()) * aux_weight
+                    aux_labels = aux_features[aux_feature].to(args.device)
+                    print(aux_outs.shape)
+                    loss += nn.BCEWithLogitsLoss()(aux_outs.squeeze(), aux_labels.float()) * aux_weight
 
         # 予測値とラベルを保存
         if isinstance(loss_func, nn.BCEWithLogitsLoss):
