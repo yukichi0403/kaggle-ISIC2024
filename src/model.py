@@ -286,7 +286,6 @@ class LayerNorm2d(nn.Module):
 class CustomConvEdgeNextModel(nn.Module):
     def __init__(self, args, training: bool = True):
         super(CustomConvEdgeNextModel, self).__init__()
-        self.aux_loss_features = args.aux_loss_features
         self.aux_loss_feature_outnum = args.aux_loss_feature_outnum
         self.training = training
         self.encoder = timm.create_model(args.model_name, pretrained=training,
@@ -297,7 +296,7 @@ class CustomConvEdgeNextModel(nn.Module):
         self.flatten = nn.Flatten()
         self.dropout_main = nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)])  # Dropout augmentation
 
-        if self.aux_loss_features is not None:
+        if self.aux_loss_feature_outnum is not None:
             self.dropout_aux = nn.ModuleList([nn.Dropout(args.dropout) for _ in range(5)])  # Dropout augmentation
             self.linear_aux = nn.Linear(self.encoder.num_features, args.aux_loss_feature_outnum[0])
         
@@ -361,7 +360,7 @@ class CustomConvEdgeNextModel(nn.Module):
             main_out += self.linear_main(self.dropout_main[i](fused_features))
         main_out = main_out / len(self.dropout_main)
 
-        if self.aux_loss_features is not None:
+        if self.aux_loss_feature_outnum is not None:
             out_aux = 0
             for i in range(len(self.dropout_aux)):
                 out_aux += self.linear_aux(self.dropout_aux[i](fused_features))

@@ -166,13 +166,14 @@ def run_one_epoch(loader, model, optimizer, lr_scheduler, args, epoch, loss_func
 
         # 補助損失の計算
         if args.aux_loss_ratio and train:
+            aux_labels = aux_features[aux_feature].to(args.device)
             for i, (aux_feature, aux_weight) in enumerate(zip(args.aux_loss_features, args.aux_loss_ratio)):
                 if args.aux_task_reg[i]:  # 回帰タスクの場合
-                    aux_labels = aux_features[aux_feature].to(args.device).float()
-                    loss += nn.MSELoss()(aux_outs.squeeze(), aux_labels) * aux_weight
-                else:  # 分類タスクの場合
-                    aux_labels = aux_features[aux_feature].to(args.device)
+                    loss += nn.MSELoss()(aux_outs.squeeze(), aux_labels.float()) * aux_weight
+                elif args.aux_task_reg[i] == 1:  # 分類タスクの場合
                     loss += nn.BCEWithLogitsLoss()(aux_outs.squeeze(), aux_labels.float()) * aux_weight
+                else:
+                    loss += nn.CrossEntropyLoss()(aux_outs.squeeze(), aux_labels.long()) * aux_weight
 
         # 予測値とラベルを保存
         if isinstance(loss_func, nn.BCEWithLogitsLoss):
@@ -242,7 +243,7 @@ def configure_optimizers(model, args):
 def run(args: DictConfig): 
     print(args)
     if args.early_stopping_rounds:
-        cprint(f"With Earlystopping　round: {args.early_stopping_rounds}.", "cyan")
+        cprint(f"With Earlystoppinground: {args.early_stopping_rounds}.", "cyan")
     set_seed(args.seed)
 
     logdir = "/kaggle/working/" if not args.COLAB else hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
