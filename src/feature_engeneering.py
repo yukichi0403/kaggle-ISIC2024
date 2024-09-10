@@ -315,9 +315,16 @@ def get_feature_cols():
         'index_age_size_symmetry',       # age_approx              * tbp_lv_areaMM2 * tbp_lv_symm_2axis
     ]
 
+    #special_cols
+    grouped_cols = []
+    for prefix in ['patient_id', 'patient_id_tbp_lv_location']:
+        for stats in ['mean', 'std', 'nunique', 'zscore', 'ecdf']:
+            for col in num_cols + new_num_cols:
+                grouped_cols += [f'{col}_{prefix}_{stats}']
+
     cat_cols = ['sex', 'anatom_site_general', 'tbp_tile_type', 'tbp_lv_location', 'tbp_lv_location_simple', 'attribution']
     special_cols = ['count_per_patient']
-    return cat_cols, num_cols, new_num_cols, special_cols
+    return cat_cols, num_cols, new_num_cols, grouped_cols, special_cols
 
 
 def reduce_mem_usage(df):

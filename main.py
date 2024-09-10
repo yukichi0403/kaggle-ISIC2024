@@ -250,31 +250,22 @@ def run(args: DictConfig):
     print(f"logdir: {logdir}")
 
     train = pd.read_csv(args.train_df_dir)
+    train["archive"]=1
     if args.use_metadata_num:
         train['age_approx'] = train['age_approx'].replace('NA', np.nan).astype(float)
         train['age_approx'] = train['age_approx'].fillna(train['age_approx'].median())
-        if args.use_metadata_num < 150:
-            meta_cols = ['isic_id', 'target', 'fold', 'archive', 'age_approx','clin_size_long_diam_mm', 'tbp_lv_A', 'tbp_lv_Aext','tbp_lv_B', 'tbp_lv_Bext', 'tbp_lv_C', 'tbp_lv_Cext', 'tbp_lv_H',
-                    'tbp_lv_Hext', 'tbp_lv_L', 'tbp_lv_Lext', 'tbp_lv_areaMM2','tbp_lv_area_perim_ratio', 'tbp_lv_color_std_mean', 'tbp_lv_deltaA',
-                    'tbp_lv_deltaB', 'tbp_lv_deltaL', 'tbp_lv_deltaLB', 'tbp_lv_deltaLBnorm', 'tbp_lv_eccentricity', 'tbp_lv_minorAxisMM',
-                    'tbp_lv_nevi_confidence', 'tbp_lv_norm_border', 'tbp_lv_norm_color', 'tbp_lv_perimeterMM', 'tbp_lv_radial_color_std_max', 
-                    'tbp_lv_stdL', 'tbp_lv_stdLExt', 'tbp_lv_symm_2axis', 'tbp_lv_symm_2axis_angle',
-                    'tbp_lv_x', 'tbp_lv_y', 'tbp_lv_z', ]
-            train = train[meta_cols]
-            # 'age_approx' の変換と欠損値の処理
-            train = feature_engeneering_for_cnn(train)
-        else:
-            cat_cols, num_cols, new_num_cols, other_cols = get_feature_cols()
-            train = read_data(args.train_df_dir, cat_cols, num_cols, new_num_cols)
+        
+        cat_cols, num_cols, new_num_cols, grouped_cols, special_cols = get_feature_cols()
+        train = train[~train["in_balanced"].isna()]
+        train = train[['isic_id', 'target', 'fold', 'archive'] + grouped_cols]
 
-            feature_cols = num_cols + new_num_cols + other_cols #cat_colは外す 
-            train = train[['isic_id', 'target', 'fold', 'archive'] + feature_cols]
+        cprint(f"drop not in balanced. after dropeed shape: {train.shape}", "cyan")
         
         # 最終的なNaNチェックと処理
         train = preprocess_numerical_cols(train)
 
         # NaNがないことを確認
-        assert train[feature_cols].isna().sum().sum() == 0, "NaN values found in the final dataset"
+        assert train.isna().sum().sum() == 0, "NaN values found in the final dataset"
 
         cprint("Preprocessing completed. No NaN values in the final dataset.", "yellow")
         print(f"all columns num: {len(train.columns)}, feature num: {len(train.columns) - 4}")
