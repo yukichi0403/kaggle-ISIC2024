@@ -252,32 +252,20 @@ def run(args: DictConfig):
     train = pd.read_csv(args.train_df_dir)
     train["archive"]=1
     if args.use_metadata_num:
-        train['age_approx'] = train['age_approx'].replace('NA', np.nan).astype(float)
-        train['age_approx'] = train['age_approx'].fillna(train['age_approx'].median())
-        
         cat_cols, num_cols, new_num_cols, grouped_cols, special_cols = get_feature_cols()
-        train = train[~train["in_balanced"].isna()]
-        train = train[['isic_id', 'target', 'fold', 'archive'] + grouped_cols]
+        metadata_cols = num_cols + new_num_cols + grouped_cols #select needed cols
 
-        cprint(f"drop not in balanced. after dropeed shape: {train.shape}", "cyan")
+        train = train[~train["in_balanced"].isna()]
+        train = train[['isic_id', 'target', 'fold', 'archive'] + metadata_cols]
+        cprint(f"Test shape: {train.shape}", "cyan")
         
         # 最終的なNaNチェックと処理
-        train = preprocess_numerical_cols(train)
-
+        train[metadata_cols] = preprocess_numerical_cols(train[metadata_cols])
         # NaNがないことを確認
         assert train.isna().sum().sum() == 0, "NaN values found in the final dataset"
 
         cprint("Preprocessing completed. No NaN values in the final dataset.", "yellow")
         print(f"all columns num: {len(train.columns)}, feature num: {len(train.columns) - 4}")
-        
-        if args.use_metadata_num > 150 and args.local_dir:
-            # Localにコピー
-            local_dir = os.path.join(args.local_dir, f"{args.expname}_{args.ver}")
-            os.makedirs(local_dir, exist_ok=True)
-            encoder_path = os.path.join(logdir, f"onehot_encoder.joblib")
-            if os.path.exists(encoder_path):
-                shutil.copy(encoder_path, local_dir)
-                print(f'Encoder saved to Local: {local_dir}')
     
         
     loader_args = {"batch_size": args.batch_size, "num_workers": args.num_workers}
